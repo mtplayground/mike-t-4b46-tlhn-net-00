@@ -1,0 +1,65 @@
+The Last Human Network (TLHN) architecture plan
+
+Product source
+- Product/brand naming comes from the issues: TLHN, "The Last Human Network".
+- PRODUCT.md is not present in the repository at setup time.
+
+Module structure
+- Root monorepo scripts coordinate frontend and backend:
+  - package.json: install, dev, build, lint, format, test, e2e entry points.
+  - frontend/: Vite + React + TypeScript SPA.
+  - backend/: Express + TypeScript API server.
+  - shared/: TypeScript-only shared contracts, enums, validation schemas, and constants used by both apps.
+- frontend/src:
+  - app/: router, route shell, shared background/layout.
+  - pages/: LandingPage and NetworkPage.
+  - components/landing/: TLHN logo, terminal story block, enter-network button.
+  - components/network/: faction modal, chat panels, composer, cooldown, countdown, tallies, subscription form.
+  - lib/: API client, polling hooks, localStorage/session identity helpers, time utilities.
+  - styles/: Tailwind entry and global glitch/scanline utilities.
+- backend/src:
+  - server.ts: Express app bootstrap and middleware.
+  - config/: environment parsing and typed runtime config.
+  - db/: PostgreSQL client, ORM schema, migrations, seeds, health check.
+  - routes/: messages, factions, subscriptions.
+  - services/: rate limiting, faction display-name generation, faction tally updates.
+  - tests/: integration/unit test helpers and route tests.
+- shared/src:
+  - factions.ts: AI_HATERS / AI_LOVERS constants, route-safe faction values, display metadata.
+  - schemas.ts: Zod request/response schemas for messages, subscriptions, faction joins/counts.
+  - timing.ts: polling interval, post cooldown, countdown deadline contract.
+
+Issue dependencies
+- Foundation:
+  - #1 creates the monorepo, Vite React app, Express server, TypeScript, lint/format, and root scripts.
+  - #2 adds typed environment config and .env.example.
+  - #3 adds PostgreSQL, ORM, migrations, and DB health.
+  - #4 adds Tailwind and TLHN visual tokens.
+- Backend data/API:
+  - #5 depends on #3 and creates messages, subscriptions, faction_counts migrations and seed data.
+  - #6, #8, and #9 depend on #5/#3 data access and shared Zod schemas.
+  - #7 wraps message creation after #6 with a 30s per-client limiter.
+  - #10 plugs into #8 faction join responses.
+  - #23 tests backend behavior once #6-#10 exist.
+- Frontend shell and visuals:
+  - #11 depends on #1/#4 route and layout setup.
+  - #12-#15 build landing and network page structure on #11/#4.
+  - #16 depends on #8/#10 and persists faction identity in localStorage.
+  - #17-#19 depend on #6/#7 and the network layout.
+  - #20 uses env-configured countdown deadline.
+  - #21 depends on #8.
+  - #22 depends on #9.
+  - #24 validates the full user flow once frontend and backend are connected.
+  - #25 is the final polish, visual fidelity, error-state, and deploy-readiness pass.
+
+Key design decisions
+- Use TypeScript end to end so frontend, backend, and shared validation schemas stay aligned.
+- Use Zod for API validation and response contracts; backend rejects invalid payloads consistently.
+- Use a relational schema with explicit faction values and a seeded faction_counts row per faction.
+- Use database uniqueness for subscription dedupe; API should return an idempotent success for duplicate valid emails.
+- Use a server-side rate limiter keyed by best available client identity: session/display identity when present, otherwise IP headers / socket IP. Return retry/cooldown seconds on 429.
+- Store faction and assigned display_name in localStorage to preserve a browser session without user accounts.
+- Poll messages and faction counts every configured interval, defaulting to about 5s.
+- Keep countdown deadline configurable by env, defaulting to 2029-12-01T07:00:00Z, equivalent to 2029-12-01 00:00:00 PDT (UTC-07).
+- Keep the backend collection-only for subscriptions; no outbound email integration.
+- Prefer focused issue-sized implementation slices; avoid broad refactors outside each issue's scope.
