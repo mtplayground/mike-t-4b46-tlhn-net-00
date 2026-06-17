@@ -7,6 +7,8 @@ import {
   type Faction,
 } from "@tlhn/shared";
 import type { FactionJoinResponse } from "@tlhn/shared/factions";
+import type { ListMessagesResponse, MessageResponse } from "@tlhn/shared/messages";
+import { clientConfig } from "./config";
 
 type RoutePath = "/" | "/network";
 
@@ -242,6 +244,98 @@ function NetworkPage() {
   );
 }
 
+interface ChatPanelProps {
+  accent: "hater" | "lover";
+  faction: Faction;
+}
+
+function ChatPanel({ accent, faction }: ChatPanelProps) {
+  const [messages, setMessages] = useState<MessageResponse[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string>();
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadMessages = async () => {
+      try {
+        const params = new URLSearchParams({ faction });
+        const response = await fetch(`/api/messages?${params.toString()}`, {
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Message fetch failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as ListMessagesResponse;
+        setMessages(data.messages);
+        setStatus("ready");
+        setErrorMessage(undefined);
+        setNow(Date.now());
+      } catch (error) {
+        if (abortController.signal.aborted) {
+          return;
+        }
+
+        setStatus("error");
+        setErrorMessage(
+          error instanceof Error ? error.message : "Message fetch failed",
+        );
+      }
+    };
+
+    void loadMessages();
+    const intervalId = window.setInterval(
+      () => void loadMessages(),
+      clientConfig.pollingIntervalMs,
+    );
+
+    return () => {
+      abortController.abort();
+      window.clearInterval(intervalId);
+    };
+  }, [faction]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return (
+    <section className={`tlhn-chat-panel tlhn-chat-panel-${accent}`}>
+      <div className="tlhn-chat-panel-header">
+        <h3>{FACTION_DISPLAY_NAMES[faction]} feed</h3>
+        <span>{formatPollingInterval(clientConfig.pollingIntervalMs)}</span>
+      </div>
+      {status === "error" ? (
+        <p className="tlhn-chat-state" role="alert">
+          {errorMessage}
+        </p>
+      ) : messages.length === 0 ? (
+        <p className="tlhn-chat-state">
+          {status === "loading" ? "Loading signal..." : "No transmissions yet."}
+        </p>
+      ) : (
+        <ol className="tlhn-chat-list" aria-live="polite">
+          {messages.map((message) => (
+            <li className="tlhn-chat-message" key={message.id}>
+              <div className="tlhn-chat-meta">
+                <strong>{message.display_name}</strong>
+                <time dateTime={message.created_at}>
+                  {formatRelativeTime(message.created_at, now)}
+                </time>
+              </div>
+              <p>{message.body}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 interface FactionSelectionModalProps {
   joinState: {
     errorMessage?: string;
@@ -399,6 +493,7 @@ function FactionColumn({
           <li key={line}>{line}</li>
         ))}
       </ul>
+      <ChatPanel accent={accent} faction={faction} />
     </section>
   );
 }
@@ -441,4 +536,26 @@ function getRouteFromPath(pathname: string): RoutePath {
   }
 
   return "/";
+}
+
+function formatPollingInterval(intervalMs: number): string {
+  const seconds = Math.max(1, Math.round(intervalMs / 1000));
+  return `${seconds}s poll`;
+}
+
+function formatRelativeTime(value: string, now: number): string {
+  const timestamp = Date.parse(value);
+
+  if (Number.isNaN(timestamp)) {
+    return "now";
+  }
+
+  const elapsedMs = Math.max(0, now - timestamp);
+  const minutes = Math.floor(elapsedMs / 60_000);
+
+  if (minutes < 1) {
+    return "now";
+  }
+
+  return `${minutes}m ago`;
 }

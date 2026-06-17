@@ -181,6 +181,67 @@
     @apply border-t border-tlhn-bone/10 pt-3;
   }
 
+  .tlhn-chat-panel {
+    @apply relative z-10 mt-7 rounded-lg border bg-tlhn-void/65 p-3 font-terminal shadow-panel-glitch;
+  }
+
+  .tlhn-chat-panel-hater {
+    @apply border-hater-500/30;
+  }
+
+  .tlhn-chat-panel-lover {
+    @apply border-lover-500/30;
+  }
+
+  .tlhn-chat-panel-header {
+    @apply flex items-center justify-between gap-3 border-b border-tlhn-bone/10 pb-3;
+  }
+
+  .tlhn-chat-panel-header h3 {
+    @apply m-0 text-sm font-bold uppercase text-tlhn-bone;
+  }
+
+  .tlhn-chat-panel-header span {
+    @apply shrink-0 text-xs uppercase text-tlhn-ash;
+  }
+
+  .tlhn-chat-state {
+    @apply m-0 py-5 text-sm text-tlhn-ash;
+  }
+
+  .tlhn-chat-list {
+    @apply m-0 grid max-h-80 list-none gap-3 overflow-y-auto p-0 pt-3;
+  }
+
+  .tlhn-chat-message {
+    @apply rounded border border-tlhn-bone/10 bg-tlhn-panel/80 p-3;
+  }
+
+  .tlhn-chat-panel-hater .tlhn-chat-message {
+    @apply border-hater-500/20;
+  }
+
+  .tlhn-chat-panel-lover .tlhn-chat-message {
+    @apply border-lover-500/20;
+  }
+
+  .tlhn-chat-meta {
+    @apply flex items-center justify-between gap-3;
+  }
+
+  .tlhn-chat-meta strong {
+    @apply min-w-0 truncate text-sm text-tlhn-bone;
+  }
+
+  .tlhn-chat-meta time {
+    @apply shrink-0 text-xs text-tlhn-ash;
+  }
+
+  .tlhn-chat-message p {
+    @apply m-0 mt-2 text-sm leading-6 text-tlhn-bone/75;
+    overflow-wrap: anywhere;
+  }
+
   .tlhn-utility-stack {
     @apply relative z-10 mt-8 grid gap-4;
   }
