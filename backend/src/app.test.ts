@@ -54,11 +54,69 @@ describe("backend API", () => {
 
     assert.equal(listedResponse.status, 200);
     const listed = await readJson<{
+      has_more: boolean;
       messages: Array<{ body: string; faction: Faction }>;
     }>(listedResponse);
+    assert.equal(listed.has_more, false);
     assert.deepEqual(
       listed.messages.map((message) => message.faction),
       ["ai_haters"],
+    );
+  });
+
+  it("paginates messages with limit and before_id newest-first", async () => {
+    for (let index = 1; index <= 30; index += 1) {
+      server.db.addMessage({
+        body: `Hater transmission ${index}`,
+        displayName: "signal_ab123",
+        faction: "ai_haters",
+      });
+    }
+
+    for (let index = 1; index <= 3; index += 1) {
+      server.db.addMessage({
+        body: `Lover transmission ${index}`,
+        displayName: "oracle_cd456",
+        faction: "ai_lovers",
+      });
+    }
+
+    const firstPageResponse = await fetch(
+      `${server.baseUrl}/api/messages?faction=ai_haters&limit=25`,
+    );
+
+    assert.equal(firstPageResponse.status, 200);
+    const firstPage = await readJson<{
+      has_more: boolean;
+      messages: Array<{ body: string; faction: Faction; id: number }>;
+    }>(firstPageResponse);
+    assert.equal(firstPage.has_more, true);
+    assert.equal(firstPage.messages.length, 25);
+    assert.deepEqual(
+      firstPage.messages.map((message) => message.faction),
+      Array.from({ length: 25 }, () => "ai_haters"),
+    );
+    assert.deepEqual(
+      firstPage.messages.map((message) => message.id),
+      Array.from({ length: 25 }, (_, index) => 30 - index),
+    );
+
+    const beforeId = firstPage.messages.at(-1)?.id;
+    assert.equal(beforeId, 6);
+
+    const secondPageResponse = await fetch(
+      `${server.baseUrl}/api/messages?faction=ai_haters&limit=25&before_id=${beforeId}`,
+    );
+
+    assert.equal(secondPageResponse.status, 200);
+    const secondPage = await readJson<{
+      has_more: boolean;
+      messages: Array<{ id: number }>;
+    }>(secondPageResponse);
+    assert.equal(secondPage.has_more, false);
+    assert.deepEqual(
+      secondPage.messages.map((message) => message.id),
+      [5, 4, 3, 2, 1],
     );
   });
 

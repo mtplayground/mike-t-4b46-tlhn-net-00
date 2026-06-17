@@ -55,6 +55,7 @@ export class TestDatabase {
 }
 
 class TestSelectBuilder implements PromiseLike<unknown[]> {
+  private beforeIdFilter?: number;
   private factionFilter?: Faction;
   private limitCount?: number;
   private selectedTable?: unknown;
@@ -67,10 +68,14 @@ class TestSelectBuilder implements PromiseLike<unknown[]> {
   }
 
   where(condition: unknown): this {
-    const value = getFirstConditionParam(condition);
-    if (isFaction(value)) {
-      this.factionFilter = value;
+    for (const value of getConditionParams(condition)) {
+      if (isFaction(value)) {
+        this.factionFilter = value;
+      } else if (typeof value === "number") {
+        this.beforeIdFilter = value;
+      }
     }
+
     return this;
   }
 
@@ -95,6 +100,10 @@ class TestSelectBuilder implements PromiseLike<unknown[]> {
       const rows = this.db.messages
         .filter(
           (message) => !this.factionFilter || message.faction === this.factionFilter,
+        )
+        .filter(
+          (message) =>
+            this.beforeIdFilter === undefined || message.id < this.beforeIdFilter,
         )
         .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
 
@@ -210,27 +219,37 @@ async function closeServer(server: Server): Promise<void> {
   });
 }
 
-function getFirstConditionParam(condition: unknown): unknown {
-  if (
-    typeof condition === "object" &&
-    condition !== null &&
-    "queryChunks" in condition &&
-    Array.isArray(condition.queryChunks)
-  ) {
-    const param = condition.queryChunks.find((chunk) => {
-      return (
-        typeof chunk === "object" &&
-        chunk !== null &&
-        chunk.constructor.name === "Param"
-      );
-    });
+function getConditionParams(condition: unknown): unknown[] {
+  const params: unknown[] = [];
+  const seen = new WeakSet<object>();
 
-    return typeof param === "object" && param !== null && "value" in param
-      ? param.value
-      : undefined;
-  }
+  const visit = (value: unknown): void => {
+    if (typeof value !== "object" || value === null || seen.has(value)) {
+      return;
+    }
 
-  return undefined;
+    seen.add(value);
+
+    if (value.constructor.name === "Param" && "value" in value) {
+      params.push(value.value);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      for (const entry of value) {
+        visit(entry);
+      }
+      return;
+    }
+
+    if ("queryChunks" in value) {
+      visit(value.queryChunks);
+    }
+  };
+
+  visit(condition);
+
+  return params;
 }
 
 function assertFaction(value: unknown): Faction {
