@@ -18,6 +18,7 @@ export interface FactionCountsResponse {
 
 export interface FactionJoinResponse {
   faction: Faction;
+  display_name: string;
   counts: FactionCounts;
   joined: true;
   already_joined: boolean;

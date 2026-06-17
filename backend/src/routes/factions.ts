@@ -9,8 +9,13 @@ import {
 } from "@tlhn/shared/factions";
 import type { AppDatabase } from "../db/client.js";
 import { factionCounts, type FactionCount } from "../db/schema.js";
+import {
+  generateFactionDisplayName,
+  isFactionDisplayName,
+} from "../services/factionDisplayName.js";
 
 const FACTION_JOIN_COOKIE = "tlhn_faction_joined";
+const FACTION_DISPLAY_NAME_COOKIE = "tlhn_display_name";
 
 export interface FactionsRouterDependencies {
   db: AppDatabase;
@@ -46,8 +51,10 @@ export function createFactionsRouter(dependencies: FactionsRouterDependencies): 
 
       if (existingJoinedFaction) {
         const counts = await loadFactionCounts(dependencies.db);
+        const displayName = getOrSetDisplayName(req, res, existingJoinedFaction);
         const response: FactionJoinResponse = {
           faction: existingJoinedFaction,
+          display_name: displayName,
           counts,
           joined: true,
           already_joined: true,
@@ -59,10 +66,13 @@ export function createFactionsRouter(dependencies: FactionsRouterDependencies): 
 
       await incrementFactionCount(dependencies.db, params.data.faction);
       const counts = await loadFactionCounts(dependencies.db);
-      setJoinedFactionCookie(req, res, params.data.faction);
+      const displayName = generateFactionDisplayName(params.data.faction);
+      setSessionCookie(req, res, FACTION_JOIN_COOKIE, params.data.faction);
+      setSessionCookie(req, res, FACTION_DISPLAY_NAME_COOKIE, displayName);
 
       const response: FactionJoinResponse = {
         faction: params.data.faction,
+        display_name: displayName,
         counts,
         joined: true,
         already_joined: false,
@@ -120,8 +130,26 @@ function getJoinedFaction(req: Request): Faction | undefined {
   return undefined;
 }
 
-function setJoinedFactionCookie(req: Request, res: Response, faction: Faction): void {
-  res.cookie(FACTION_JOIN_COOKIE, faction, {
+function getOrSetDisplayName(req: Request, res: Response, faction: Faction): string {
+  const cookieValue = parseCookies(req.headers.cookie).get(FACTION_DISPLAY_NAME_COOKIE);
+
+  if (cookieValue && isFactionDisplayName(cookieValue)) {
+    return cookieValue;
+  }
+
+  const displayName = generateFactionDisplayName(faction);
+  setSessionCookie(req, res, FACTION_DISPLAY_NAME_COOKIE, displayName);
+
+  return displayName;
+}
+
+function setSessionCookie(
+  req: Request,
+  res: Response,
+  name: string,
+  value: string,
+): void {
+  res.cookie(name, value, {
     httpOnly: true,
     path: "/api/factions",
     sameSite: "lax",
