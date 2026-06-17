@@ -187,6 +187,10 @@ function NetworkPage() {
   );
   const [factionCounts, setFactionCounts] =
     useState<FactionCounts>(INITIAL_FACTION_COUNTS);
+  const [countsState, setCountsState] = useState<{
+    errorMessage?: string;
+    status: "loading" | "ready" | "error";
+  }>({ status: "loading" });
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [joinState, setJoinState] = useState<{
     errorMessage?: string;
@@ -209,9 +213,15 @@ function NetworkPage() {
 
         const data = (await response.json()) as FactionCountsResponse;
         setFactionCounts(toFactionCounts(data.counts));
+        setCountsState({ status: "ready" });
       } catch (error) {
         if (!abortController.signal.aborted) {
           console.error("Faction count fetch failed", error);
+          setCountsState({
+            errorMessage:
+              error instanceof Error ? error.message : "Faction count fetch failed",
+            status: "error",
+          });
         }
       }
     };
@@ -282,6 +292,7 @@ function NetworkPage() {
           <h1 id="network-title" className="tlhn-network-title">
             Network
           </h1>
+          <NetworkStatusNotice countsState={countsState} />
           <CountdownTimer />
           <EmailSubscriptionForm />
           <div className="tlhn-utility-stack" aria-label="Network utilities">
@@ -293,7 +304,10 @@ function NetworkPage() {
               label="Faction"
               value={identity ? FACTION_DISPLAY_NAMES[identity.faction] : "Unassigned"}
             />
-            <UtilityLine label="Transmission" value="Standby" />
+            <UtilityLine
+              label="Transmission"
+              value={identity ? "Live channel" : "Awaiting faction"}
+            />
           </div>
         </section>
         <FactionColumn
@@ -316,6 +330,32 @@ function NetworkPage() {
         <FactionSelectionModal joinState={joinState} onJoinFaction={joinFaction} />
       )}
     </>
+  );
+}
+
+interface NetworkStatusNoticeProps {
+  countsState: {
+    errorMessage?: string;
+    status: "loading" | "ready" | "error";
+  };
+}
+
+function NetworkStatusNotice({ countsState }: NetworkStatusNoticeProps) {
+  if (countsState.status === "ready") {
+    return null;
+  }
+
+  return (
+    <p
+      className={`tlhn-network-notice ${
+        countsState.status === "error" ? "tlhn-network-notice-error" : ""
+      }`}
+      role={countsState.status === "error" ? "alert" : "status"}
+    >
+      {countsState.status === "loading"
+        ? "Synchronizing faction tallies..."
+        : `Tally sync failed: ${countsState.errorMessage ?? "unknown error"}`}
+    </p>
   );
 }
 
@@ -550,12 +590,18 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
         <span>{formatPollingInterval(clientConfig.pollingIntervalMs)}</span>
       </div>
       {status === "error" ? (
-        <p className="tlhn-chat-state" role="alert">
-          {errorMessage}
+        <p
+          className={`tlhn-chat-state tlhn-chat-state-${accent} tlhn-chat-state-error`}
+          role="alert"
+        >
+          &gt;_ {errorMessage}
         </p>
       ) : messages.length === 0 ? (
-        <p className="tlhn-chat-state">
-          {status === "loading" ? "Loading signal..." : "No transmissions yet."}
+        <p className={`tlhn-chat-state tlhn-chat-state-${accent}`}>
+          &gt;_{" "}
+          {status === "loading"
+            ? "Loading signal..."
+            : "No transmissions yet. Hold the channel."}
         </p>
       ) : (
         <ol className="tlhn-chat-list" aria-live="polite">
@@ -623,7 +669,7 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
     const trimmedBody = body.trim();
     if (!trimmedBody) {
       setSubmitState({
-        errorMessage: "Message body required",
+        errorMessage: "Message body required.",
         status: "error",
       });
       return;
