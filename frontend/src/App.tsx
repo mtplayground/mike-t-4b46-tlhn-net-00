@@ -16,8 +16,10 @@ import type { FactionJoinResponse } from "@tlhn/shared/factions";
 import type {
   CreateMessageResponse,
   ListMessagesResponse,
+  MessagePostRateLimitResponse,
   MessageResponse,
 } from "@tlhn/shared/messages";
+import { MESSAGE_POST_COOLDOWN_MS } from "@tlhn/shared/messages";
 import { clientConfig } from "./config";
 
 type RoutePath = "/" | "/network";
@@ -366,14 +368,41 @@ interface MessageComposerProps {
 
 function MessageComposer({ accent, identity, onMessageCreated }: MessageComposerProps) {
   const [body, setBody] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [submitState, setSubmitState] = useState<{
     errorMessage?: string;
     status: "idle" | "submitting" | "error";
   }>({ status: "idle" });
   const isSubmitting = submitState.status === "submitting";
+  const cooldownRemainingMs = Math.max(0, (cooldownUntil ?? 0) - cooldownNow);
+  const cooldownRemainingSeconds = Math.ceil(cooldownRemainingMs / 1000);
+  const isCoolingDown = cooldownRemainingSeconds > 0;
+
+  useEffect(() => {
+    if (!cooldownUntil) {
+      return undefined;
+    }
+
+    setCooldownNow(Date.now());
+    const intervalId = window.setInterval(() => {
+      const nextNow = Date.now();
+      setCooldownNow(nextNow);
+
+      if (nextNow >= cooldownUntil) {
+        setCooldownUntil(null);
+      }
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, [cooldownUntil]);
 
   const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+
+    if (isCoolingDown) {
+      return;
+    }
 
     const trimmedBody = body.trim();
     if (!trimmedBody) {
@@ -402,22 +431,23 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
 
       const data = (await response.json().catch(() => null)) as
         | CreateMessageResponse
-        | { error?: string; retry_after_seconds?: number }
+        | MessagePostRateLimitResponse
+        | { error?: string }
         | null;
 
       if (!response.ok) {
-        const retryAfterSeconds =
-          data && "retry_after_seconds" in data ? data.retry_after_seconds : undefined;
-        const cooldownSuffix =
-          typeof retryAfterSeconds === "number"
-            ? ` Retry in ${retryAfterSeconds}s.`
-            : "";
+        if (isRateLimitResponse(data)) {
+          setCooldownUntil(getRateLimitCooldownUntil(data));
+          setCooldownNow(Date.now());
+          throw new Error("Cooldown active. Wait for the timer before posting.");
+        }
+
         const message =
           data && "error" in data && typeof data.error === "string"
             ? data.error
             : `Message post failed with status ${response.status}`;
 
-        throw new Error(`${message}.${cooldownSuffix}`);
+        throw new Error(message);
       }
 
       if (!data || !("message" in data)) {
@@ -425,6 +455,8 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
       }
 
       setBody("");
+      setCooldownUntil(Date.now() + MESSAGE_POST_COOLDOWN_MS);
+      setCooldownNow(Date.now());
       setSubmitState({ status: "idle" });
       onMessageCreated();
     } catch (error) {
@@ -459,12 +491,17 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
         />
         <button
           className="tlhn-message-post-button"
-          disabled={isSubmitting}
+          disabled={isSubmitting || isCoolingDown}
           type="submit"
         >
-          {isSubmitting ? "POSTING" : "POST"}
+          {isSubmitting ? "POSTING" : isCoolingDown ? "COOLDOWN" : "POST"}
         </button>
       </div>
+      {isCoolingDown && (
+        <p className="tlhn-message-cooldown" role="status">
+          Cooldown: {cooldownRemainingSeconds}s
+        </p>
+      )}
       {submitState.status === "error" && (
         <p className="tlhn-message-composer-error" role="alert">
           {submitState.errorMessage}
@@ -472,6 +509,35 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
       )}
     </form>
   );
+}
+
+function isRateLimitResponse(
+  value:
+    | CreateMessageResponse
+    | MessagePostRateLimitResponse
+    | { error?: string }
+    | null,
+): value is MessagePostRateLimitResponse {
+  if (!value) {
+    return false;
+  }
+
+  return (
+    "error" in value &&
+    value.error === "Message post cooldown active" &&
+    "next_allowed_at" in value &&
+    typeof value.next_allowed_at === "string"
+  );
+}
+
+function getRateLimitCooldownUntil(response: MessagePostRateLimitResponse): number {
+  const nextAllowedAt = Date.parse(response.next_allowed_at);
+
+  if (!Number.isNaN(nextAllowedAt)) {
+    return nextAllowedAt;
+  }
+
+  return Date.now() + Math.max(0, response.retry_after_ms);
 }
 
 interface FactionSelectionModalProps {
