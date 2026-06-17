@@ -587,7 +587,6 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
     <section className={`tlhn-chat-panel tlhn-chat-panel-${accent}`}>
       <div className="tlhn-chat-panel-header">
         <h3>{FACTION_DISPLAY_NAMES[faction]} feed</h3>
-        <span>{formatPollingInterval(clientConfig.pollingIntervalMs)}</span>
       </div>
       {status === "error" ? (
         <p
@@ -1029,11 +1028,6 @@ function getRouteFromPath(pathname: string): RoutePath {
   }
 
   return "/";
-}
-
-function formatPollingInterval(intervalMs: number): string {
-  const seconds = Math.max(1, Math.round(intervalMs / 1000));
-  return `${seconds}s poll`;
 }
 
 function formatRelativeTime(value: string, now: number): string {
