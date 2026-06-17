@@ -1,65 +1,55 @@
-The Last Human Network (TLHN) architecture plan
+# Architecture plan for Issues #51-#53
 
-Product source
-- Product/brand naming comes from the issues: TLHN, "The Last Human Network".
-- PRODUCT.md is not present in the repository at setup time.
+Product: The Last Human Network (TLHN), a TypeScript npm-workspace monorepo with a Vite React frontend, Express backend, shared DTO/constants package, Tailwind styling, and PostgreSQL persistence.
 
-Module structure
-- Root monorepo scripts coordinate frontend and backend:
-  - package.json: install, dev, build, lint, format, test, e2e entry points.
-  - frontend/: Vite + React + TypeScript SPA.
-  - backend/: Express + TypeScript API server.
-  - shared/: TypeScript-only shared contracts, enums, validation schemas, and constants used by both apps.
-- frontend/src:
-  - app/: router, route shell, shared background/layout.
-  - pages/: LandingPage and NetworkPage.
-  - components/landing/: TLHN logo, terminal story block, enter-network button.
-  - components/network/: faction modal, chat panels, composer, cooldown, countdown, tallies, subscription form.
-  - lib/: API client, polling hooks, localStorage/session identity helpers, time utilities.
-  - styles/: Tailwind entry and global glitch/scanline utilities.
-- backend/src:
-  - server.ts: Express app bootstrap and middleware.
-  - config/: environment parsing and typed runtime config.
-  - db/: PostgreSQL client, ORM schema, migrations, seeds, health check.
-  - routes/: messages, factions, subscriptions.
-  - services/: rate limiting, faction display-name generation, faction tally updates.
-  - tests/: integration/unit test helpers and route tests.
-- shared/src:
-  - factions.ts: AI_HATERS / AI_LOVERS constants, route-safe faction values, display metadata.
-  - schemas.ts: Zod request/response schemas for messages, subscriptions, faction joins/counts.
-  - timing.ts: polling interval, post cooldown, countdown deadline contract.
+## Relevant module structure
 
-Issue dependencies
-- Foundation:
-  - #1 creates the monorepo, Vite React app, Express server, TypeScript, lint/format, and root scripts.
-  - #2 adds typed environment config and .env.example.
-  - #3 adds PostgreSQL, ORM, migrations, and DB health.
-  - #4 adds Tailwind and TLHN visual tokens.
-- Backend data/API:
-  - #5 depends on #3 and creates messages, subscriptions, faction_counts migrations and seed data.
-  - #6, #8, and #9 depend on #5/#3 data access and shared Zod schemas.
-  - #7 wraps message creation after #6 with a 30s per-client limiter.
-  - #10 plugs into #8 faction join responses.
-  - #23 tests backend behavior once #6-#10 exist.
-- Frontend shell and visuals:
-  - #11 depends on #1/#4 route and layout setup.
-  - #12-#15 build landing and network page structure on #11/#4.
-  - #16 depends on #8/#10 and persists faction identity in localStorage.
-  - #17-#19 depend on #6/#7 and the network layout.
-  - #20 uses env-configured countdown deadline.
-  - #21 depends on #8.
-  - #22 depends on #9.
-  - #24 validates the full user flow once frontend and backend are connected.
-  - #25 is the final polish, visual fidelity, error-state, and deploy-readiness pass.
+- `frontend/src/App.tsx`
+  - Contains the SPA shell, landing page, `/network` route, `CountdownTimer`, `CountdownUnit`, `ChatPanel`, `FactionColumn`, message composer, and UI helpers.
+  - Issues #51-#53 are frontend-only adjustments in this file's React markup/helper usage.
+- `frontend/src/styles.css`
+  - Tailwind `@layer components` definitions for countdown tiles, chat panels/lists, and feed headers.
+  - Primary styling target for countdown reflow and chat viewport constraints.
+- `frontend/tailwind.config.ts`
+  - Existing theme tokens and utilities; no new dependency expected.
+- `shared/src/*`, `backend/src/*`, and database schema
+  - No API, DTO, persistence, or migration changes expected for this batch.
 
-Key design decisions
-- Use TypeScript end to end so frontend, backend, and shared validation schemas stay aligned.
-- Use Zod for API validation and response contracts; backend rejects invalid payloads consistently.
-- Use a relational schema with explicit faction values and a seeded faction_counts row per faction.
-- Use database uniqueness for subscription dedupe; API should return an idempotent success for duplicate valid emails.
-- Use a server-side rate limiter keyed by best available client identity: session/display identity when present, otherwise IP headers / socket IP. Return retry/cooldown seconds on 429.
-- Store faction and assigned display_name in localStorage to preserve a browser session without user accounts.
-- Poll messages and faction counts every configured interval, defaulting to about 5s.
-- Keep countdown deadline configurable by env, defaulting to 2029-12-01T07:00:00Z, equivalent to 2029-12-01 00:00:00 PDT (UTC-07).
-- Keep the backend collection-only for subscriptions; no outbound email integration.
-- Prefer focused issue-sized implementation slices; avoid broad refactors outside each issue's scope.
+## Issue plan
+
+### Issue #51: Fix countdown DAYS tile clipping in the narrow center column
+
+- Adjust countdown layout/classes in `frontend/src/styles.css` and, only if needed, the `CountdownTimer`/`CountdownUnit` JSX in `frontend/src/App.tsx`.
+- Preserve the existing four-unit countdown semantics (`DAYS`, `HRS`, `MINS`, `SECS`).
+- Make the DAYS tile wide enough for 100+ day values, use tabular numerals, prevent wrapping, and remove any clipping that cuts off the rendered number.
+- Prefer CSS grid changes that keep the center utility column responsive rather than hard-coding global page width.
+
+### Issue #52: Remove the "5s poll" label from both chat feed headers
+
+- Update `ChatPanel` in `frontend/src/App.tsx` to remove the polling interval `<span>` from the feed header.
+- Remove the now-unused `formatPollingInterval` helper from `App.tsx`.
+- Keep actual polling behavior unchanged; `clientConfig.pollingIntervalMs` should still drive message refresh intervals.
+- If header styling assumed a right-aligned label, simplify CSS in `frontend/src/styles.css` without changing panel identity or titles.
+
+### Issue #53: Constrain chat feed to a fixed-height scrollable viewport
+
+- Adjust chat feed styles in `frontend/src/styles.css`, especially `.tlhn-chat-list` and surrounding chat-panel containers.
+- Ensure heavy posting scrolls inside each faction feed with explicit max/fixed height, `overflow-y-auto`, and `overscroll-contain`.
+- Preserve backend's existing 50-message limit and frontend polling behavior.
+- Avoid changing message DTOs, API routes, or persistence.
+
+## Dependencies and sequencing
+
+- The issues have no hard dependencies and can be implemented independently.
+- Recommended sequence:
+  1. Issue #52 first because it removes markup/helper surface area from `ChatPanel`.
+  2. Issue #53 next because it refines the same chat panel/list styling.
+  3. Issue #51 can be done before or after chat work; it touches the countdown utility area, not chat data flow.
+
+## Key design decisions
+
+- Keep the changes frontend-only unless tests reveal a type/lint fallout.
+- Continue using existing Tailwind component classes and TLHN visual tokens; do not introduce UI libraries.
+- Do not rename product/faction labels; use `The Last Human Network`, `TLHN`, `AI Haters`, and `AI Lovers` from existing shared conventions.
+- Avoid database or API changes. PostgreSQL-backed messages, tallies, and subscriptions remain as-is.
+- Validation for each implementation should include `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when feasible.
