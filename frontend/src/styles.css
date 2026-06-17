@@ -181,6 +181,47 @@
     @apply mt-2 block text-[0.65rem] font-bold text-tlhn-ash;
   }
 
+  .tlhn-subscription-form {
+    @apply relative z-10 mt-4 rounded-lg border border-hater-500/30 bg-tlhn-void/70 p-3 font-terminal shadow-panel-glitch;
+  }
+
+  .tlhn-subscription-copy {
+    @apply text-center uppercase;
+  }
+
+  .tlhn-subscription-copy p {
+    @apply m-0 text-xs font-bold text-tlhn-ash;
+  }
+
+  .tlhn-subscription-copy h2 {
+    @apply m-0 mt-1 text-xl font-black leading-none text-hater-500 text-glow-hater;
+  }
+
+  .tlhn-subscription-row {
+    @apply mt-3 grid gap-2;
+  }
+
+  .tlhn-subscription-input {
+    @apply min-h-11 min-w-0 rounded border border-tlhn-bone/15 bg-tlhn-panel/90 px-3 text-sm text-tlhn-bone outline-none transition duration-150 placeholder:text-tlhn-ash/75 focus:border-hater-500 focus:ring-2 focus:ring-hater-500/45 disabled:cursor-wait disabled:opacity-65;
+  }
+
+  .tlhn-subscription-button {
+    @apply min-h-11 rounded border border-hater-500 bg-hater-500/10 px-4 text-sm font-bold uppercase text-tlhn-bone shadow-neon-hater transition duration-150 hover:bg-hater-500/20 focus:outline-none focus:ring-2 focus:ring-hater-500 focus:ring-offset-2 focus:ring-offset-tlhn-void disabled:cursor-wait disabled:opacity-65;
+  }
+
+  .tlhn-subscription-success,
+  .tlhn-subscription-error {
+    @apply m-0 mt-3 text-xs leading-5;
+  }
+
+  .tlhn-subscription-success {
+    @apply text-lover-300;
+  }
+
+  .tlhn-subscription-error {
+    @apply text-hater-300;
+  }
+
   .tlhn-faction-column-hater .tlhn-faction-title {
     @apply text-hater-500 text-glow-hater;
   }

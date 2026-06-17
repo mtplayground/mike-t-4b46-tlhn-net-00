@@ -24,6 +24,7 @@ import type {
   MessageResponse,
 } from "@tlhn/shared/messages";
 import { MESSAGE_POST_COOLDOWN_MS } from "@tlhn/shared/messages";
+import type { SubscriptionResponse } from "@tlhn/shared/subscriptions";
 import { clientConfig } from "./config";
 
 type RoutePath = "/" | "/network";
@@ -47,6 +48,7 @@ const HUMAN_COLLAPSE_STORY_LINES = [
 
 const NETWORK_IDENTITY_STORAGE_KEY = "tlhn_network_identity";
 const DISPLAY_NAME_PATTERN = /^[a-z][a-z0-9]*_[a-z0-9]{5}$/;
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const INITIAL_FACTION_COUNTS: FactionCounts = {
   ai_haters: 0,
   ai_lovers: 0,
@@ -281,6 +283,7 @@ function NetworkPage() {
             Network
           </h1>
           <CountdownTimer />
+          <EmailSubscriptionForm />
           <div className="tlhn-utility-stack" aria-label="Network utilities">
             <UtilityLine
               label="Identity"
@@ -370,6 +373,113 @@ function FactionTallyDisplay({ accent, count, faction }: FactionTallyDisplayProp
       </span>
       <strong className="tlhn-faction-tally-value">{formatFactionCount(count)}</strong>
     </div>
+  );
+}
+
+function EmailSubscriptionForm() {
+  const [email, setEmail] = useState("");
+  const [subscriptionState, setSubscriptionState] = useState<{
+    message?: string;
+    status: "idle" | "submitting" | "success" | "error";
+  }>({ status: "idle" });
+  const isSubmitting = subscriptionState.status === "submitting";
+
+  const submitSubscription = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedEmail = email.trim();
+    if (!EMAIL_PATTERN.test(trimmedEmail)) {
+      setSubscriptionState({
+        message: "Enter a valid email address.",
+        status: "error",
+      });
+      return;
+    }
+
+    setSubscriptionState({ status: "submitting" });
+
+    try {
+      const response = await fetch("/api/subscriptions", {
+        body: JSON.stringify({ email: trimmedEmail }),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => null)) as
+        | SubscriptionResponse
+        | { error?: string }
+        | null;
+
+      if (!response.ok) {
+        const message =
+          data && "error" in data && typeof data.error === "string"
+            ? data.error
+            : `Subscription failed with status ${response.status}`;
+        throw new Error(message);
+      }
+
+      if (!data || !("subscribed" in data) || data.subscribed !== true) {
+        throw new Error("Subscription response was invalid");
+      }
+
+      setEmail("");
+      setSubscriptionState({
+        message: data.already_subscribed
+          ? "Signal already registered."
+          : "Updates locked to your signal.",
+        status: "success",
+      });
+    } catch (error) {
+      setSubscriptionState({
+        message: error instanceof Error ? error.message : "Subscription failed",
+        status: "error",
+      });
+    }
+  };
+
+  return (
+    <form className="tlhn-subscription-form" onSubmit={submitSubscription}>
+      <div className="tlhn-subscription-copy">
+        <p>KEEP YOUR HUMANITY</p>
+        <h2>KEEP UPDATES</h2>
+      </div>
+      <div className="tlhn-subscription-row">
+        <input
+          className="tlhn-subscription-input"
+          disabled={isSubmitting}
+          inputMode="email"
+          maxLength={320}
+          onChange={(event) => {
+            setEmail(event.target.value);
+            if (subscriptionState.status === "error") {
+              setSubscriptionState({ status: "idle" });
+            }
+          }}
+          placeholder="human@signal.net"
+          type="email"
+          value={email}
+        />
+        <button
+          className="tlhn-subscription-button"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          {isSubmitting ? "SENDING" : "SUBSCRIBE"}
+        </button>
+      </div>
+      {subscriptionState.status === "success" && (
+        <p className="tlhn-subscription-success" role="status">
+          {subscriptionState.message}
+        </p>
+      )}
+      {subscriptionState.status === "error" && (
+        <p className="tlhn-subscription-error" role="alert">
+          {subscriptionState.message}
+        </p>
+      )}
+    </form>
   );
 }
 
