@@ -3,40 +3,44 @@
 The Last Human Network (TLHN) is a self-hosted TypeScript web app about the
 fictional Human Collapse and the split between AI Haters and AI Lovers. It ships
 as a Vite React frontend served by an Express API backend, with shared
-TypeScript DTOs and constants in a monorepo.
+TypeScript contracts and PostgreSQL-backed state in a monorepo.
 
 ## Current Product
 
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
-- `/network` SPA route with a three-column layout: AI Haters on the left,
-  utility core in the center, and AI Lovers on the right.
+- `/network` SPA route with AI Haters on the left, a utility core in the center,
+  AI Lovers on the right, and a full-width countdown band spanning the network
+  page above the columns.
 - Required faction-selection modal on first network entry. Joining assigns a
   generated `prefix_xxxxx` display name, increments faction tallies, and stores
   the selected faction/name in browser localStorage for the session experience.
 - Faction chat panels poll `/api/messages` about every 5 seconds, show display
-  names, message bodies, and relative timestamps without exposing a polling
-  label in the feed headers.
-- Chat feeds are fixed-height, internally scrollable viewports with overscroll
-  containment so heavy posting stays inside each faction panel; the backend
-  still limits reads to the latest 50 messages.
+  names, message bodies, and relative timestamps, and keep feed headers focused
+  on the faction feed name.
+- Chat feeds initially load the latest 25 messages, render oldest-to-newest so
+  the newest message sits at the bottom, and support scroll-up infinite history
+  loading via `before_id` while preserving scroll position. The viewport is
+  internally scrollable, overscroll-contained, and sized for roughly 15 message
+  rows before scrolling.
 - Message composer posts as the selected faction/name, enforces a 30-second
   cooldown in the UI, and handles backend 429 responses gracefully.
 - Live red/blue faction tally displays poll `/api/factions/counts`.
 - Flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
-  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. The
-  DAYS tile is widened/reflowed with tabular no-wrap numerals so 100+ day
-  counts do not clip in the narrow center column.
+  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. Its
+  neon tile band is full-width on the network page so all day/hour/minute/second
+  tiles avoid clipping at responsive widths.
 - Email subscription form posts to `/api/subscriptions`, validates client-side,
   and shows success, duplicate, and error states.
 
 ## Architecture
 
 - Monorepo packages:
-  - `frontend/`: Vite React SPA, Tailwind visual system.
+  - `frontend/`: Vite React SPA and Tailwind TLHN visual system.
   - `backend/`: Express API and static frontend host.
-  - `shared/`: cross-package constants, schemas, DTO types, and product names.
+  - `shared/`: cross-package constants, Zod schemas, DTO types, and product
+    names.
 - Express serves API routes under `/api/*` and serves `frontend/dist` after
   `npm run build`.
 - Runtime server defaults to `HOST=0.0.0.0` and `PORT=8080`.
@@ -52,7 +56,10 @@ TypeScript DTOs and constants in a monorepo.
 - `GET /api/health`
 - `GET /api/factions/counts`
 - `POST /api/factions/:faction/join`
-- `GET /api/messages?faction=ai_haters|ai_lovers`
+- `GET /api/messages?faction=ai_haters|ai_lovers&limit=25&before_id=123`
+  - Returns `{ messages, has_more }` newest-first.
+  - `limit` defaults to 25 and is capped at 50.
+  - `before_id` pages older messages using the message id cursor.
 - `POST /api/messages`
 - `POST /api/subscriptions`
 
@@ -83,5 +90,5 @@ npm test
 ```
 
 `npm test` includes type checks plus backend integration and end-to-end API flow
-tests for faction join, message posting, cooldown handling, polling reads,
-tallies, and subscription dedupe.
+tests for faction join, message posting, cooldown handling, message pagination,
+polling reads, tallies, and subscription dedupe.
