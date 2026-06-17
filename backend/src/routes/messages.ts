@@ -1,4 +1,4 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, lt } from "drizzle-orm";
 import { Router, type Request, type Response } from "express";
 import {
   createMessageRequestSchema,
@@ -12,8 +12,6 @@ import {
   type MessagePostRateLimitDenied,
   type MessagePostRateLimiter,
 } from "../services/messagePostRateLimit.js";
-
-const RECENT_MESSAGE_LIMIT = 50;
 
 export interface MessagesRouterDependencies {
   db: AppDatabase;
@@ -35,21 +33,44 @@ export function createMessagesRouter(dependencies: MessagesRouterDependencies): 
     }
 
     try {
-      const rows = query.data.faction
-        ? await dependencies.db
-            .select()
-            .from(messages)
-            .where(eq(messages.faction, query.data.faction))
-            .orderBy(desc(messages.createdAt))
-            .limit(RECENT_MESSAGE_LIMIT)
-        : await dependencies.db
-            .select()
-            .from(messages)
-            .orderBy(desc(messages.createdAt))
-            .limit(RECENT_MESSAGE_LIMIT);
+      const fetchLimit = query.data.limit + 1;
+      const rows =
+        query.data.faction && query.data.before_id
+          ? await dependencies.db
+              .select()
+              .from(messages)
+              .where(
+                and(
+                  eq(messages.faction, query.data.faction),
+                  lt(messages.id, query.data.before_id),
+                ),
+              )
+              .orderBy(desc(messages.id))
+              .limit(fetchLimit)
+          : query.data.faction
+            ? await dependencies.db
+                .select()
+                .from(messages)
+                .where(eq(messages.faction, query.data.faction))
+                .orderBy(desc(messages.id))
+                .limit(fetchLimit)
+            : query.data.before_id
+              ? await dependencies.db
+                  .select()
+                  .from(messages)
+                  .where(lt(messages.id, query.data.before_id))
+                  .orderBy(desc(messages.id))
+                  .limit(fetchLimit)
+              : await dependencies.db
+                  .select()
+                  .from(messages)
+                  .orderBy(desc(messages.id))
+                  .limit(fetchLimit);
+      const pageRows = rows.slice(0, query.data.limit);
 
       res.json({
-        messages: rows.map(toMessageResponse),
+        has_more: rows.length > query.data.limit,
+        messages: pageRows.map(toMessageResponse),
       });
     } catch (error) {
       next(error);

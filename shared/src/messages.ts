@@ -6,6 +6,8 @@ export const factionSchema = z.enum(FACTIONS);
 export const listMessagesQuerySchema = z
   .object({
     faction: factionSchema.optional(),
+    limit: z.coerce.number().int().min(1).max(50).default(25),
+    before_id: z.coerce.number().int().min(1).optional(),
   })
   .strict();
 
@@ -32,6 +34,7 @@ export interface MessageResponse {
 }
 
 export interface ListMessagesResponse {
+  has_more: boolean;
   messages: MessageResponse[];
 }
 

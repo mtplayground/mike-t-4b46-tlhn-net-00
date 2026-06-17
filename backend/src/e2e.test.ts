@@ -89,12 +89,14 @@ describe("network end-to-end flow", () => {
     );
     assert.equal(messagesResponse.status, 200);
     const listedMessages = await readJson<{
+      has_more: boolean;
       messages: Array<{
         body: string;
         display_name: string;
         faction: Faction;
       }>;
     }>(messagesResponse);
+    assert.equal(listedMessages.has_more, false);
     assert.equal(listedMessages.messages.length, 1);
     assert.equal(listedMessages.messages[0]?.body, messageBody);
     assert.equal(listedMessages.messages[0]?.display_name, joined.display_name);
@@ -134,5 +136,47 @@ describe("network end-to-end flow", () => {
     assert.deepEqual(await readJson(finalCountsResponse), {
       counts: { ai_haters: 1, ai_lovers: 0 },
     });
+  });
+
+  it("pages through more than 25 faction messages newest-first", async () => {
+    for (let index = 1; index <= 28; index += 1) {
+      server.db.addMessage({
+        body: `Paged signal ${index}`,
+        displayName: "sentinel_pg001",
+        faction: "ai_haters",
+      });
+    }
+
+    const firstPageResponse = await fetch(
+      `${server.baseUrl}/api/messages?faction=ai_haters`,
+    );
+
+    assert.equal(firstPageResponse.status, 200);
+    const firstPage = await readJson<{
+      has_more: boolean;
+      messages: Array<{ body: string; id: number }>;
+    }>(firstPageResponse);
+    assert.equal(firstPage.has_more, true);
+    assert.equal(firstPage.messages.length, 25);
+    assert.equal(firstPage.messages[0]?.body, "Paged signal 28");
+    assert.equal(firstPage.messages.at(-1)?.body, "Paged signal 4");
+
+    const beforeId = firstPage.messages.at(-1)?.id;
+    assert(beforeId);
+
+    const secondPageResponse = await fetch(
+      `${server.baseUrl}/api/messages?faction=ai_haters&before_id=${beforeId}`,
+    );
+
+    assert.equal(secondPageResponse.status, 200);
+    const secondPage = await readJson<{
+      has_more: boolean;
+      messages: Array<{ body: string }>;
+    }>(secondPageResponse);
+    assert.equal(secondPage.has_more, false);
+    assert.deepEqual(
+      secondPage.messages.map((message) => message.body),
+      ["Paged signal 3", "Paged signal 2", "Paged signal 1"],
+    );
   });
 });
