@@ -50,4 +50,32 @@
   .tlhn-terminal-button {
     @apply mt-7 inline-flex min-h-11 items-center rounded-md border border-hater-500 px-4 font-terminal font-bold text-tlhn-bone no-underline shadow-neon-hater transition duration-150 hover:bg-hater-500/15 focus:outline-none focus:ring-2 focus:ring-hater-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
   }
+
+  .tlhn-shell {
+    @apply flex flex-col items-stretch justify-start px-5 py-5 sm:px-8 sm:py-7;
+  }
+
+  .tlhn-shell-header {
+    @apply relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between gap-4 border-b border-tlhn-bone/10 pb-4;
+  }
+
+  .tlhn-nav {
+    @apply flex items-center gap-2 rounded-md border border-tlhn-bone/10 bg-tlhn-panel/70 p-1 shadow-panel-glitch backdrop-blur-sm;
+  }
+
+  .tlhn-nav-link {
+    @apply rounded px-3 py-2 font-terminal text-sm text-tlhn-ash no-underline transition duration-150 hover:bg-tlhn-bone/10 hover:text-tlhn-bone focus:outline-none focus:ring-2 focus:ring-lover-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
+  }
+
+  .tlhn-nav-link[aria-current="page"] {
+    @apply bg-lover-500/15 text-lover-100 shadow-neon-lover;
+  }
+
+  .tlhn-shell-main {
+    @apply relative z-10 mx-auto flex min-h-[calc(100vh-6.5rem)] w-full max-w-6xl items-center py-10;
+  }
+
+  .tlhn-page-panel {
+    @apply w-full max-w-[860px] rounded-lg border border-tlhn-bone/15 bg-tlhn-panel/85 p-7 shadow-panel-glitch backdrop-blur-sm sm:p-9;
+  }
 }
