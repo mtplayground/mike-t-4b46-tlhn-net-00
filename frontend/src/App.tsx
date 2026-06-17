@@ -12,7 +12,11 @@ import {
   PRODUCT_SHORT_NAME,
   type Faction,
 } from "@tlhn/shared";
-import type { FactionJoinResponse } from "@tlhn/shared/factions";
+import type {
+  FactionCounts,
+  FactionCountsResponse,
+  FactionJoinResponse,
+} from "@tlhn/shared/factions";
 import type {
   CreateMessageResponse,
   ListMessagesResponse,
@@ -43,6 +47,10 @@ const HUMAN_COLLAPSE_STORY_LINES = [
 
 const NETWORK_IDENTITY_STORAGE_KEY = "tlhn_network_identity";
 const DISPLAY_NAME_PATTERN = /^[a-z][a-z0-9]*_[a-z0-9]{5}$/;
+const INITIAL_FACTION_COUNTS: FactionCounts = {
+  ai_haters: 0,
+  ai_lovers: 0,
+};
 
 interface NetworkIdentity {
   faction: Faction;
@@ -175,11 +183,48 @@ function NetworkPage() {
   const [identity, setIdentity] = useState<NetworkIdentity | null>(() =>
     readStoredNetworkIdentity(),
   );
+  const [factionCounts, setFactionCounts] =
+    useState<FactionCounts>(INITIAL_FACTION_COUNTS);
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [joinState, setJoinState] = useState<{
     errorMessage?: string;
     status: "idle" | "joining" | "error";
   }>({ status: "idle" });
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadFactionCounts = async () => {
+      try {
+        const response = await fetch("/api/factions/counts", {
+          credentials: "include",
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Faction count fetch failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as FactionCountsResponse;
+        setFactionCounts(toFactionCounts(data.counts));
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error("Faction count fetch failed", error);
+        }
+      }
+    };
+
+    void loadFactionCounts();
+    const intervalId = window.setInterval(
+      () => void loadFactionCounts(),
+      clientConfig.pollingIntervalMs,
+    );
+
+    return () => {
+      abortController.abort();
+      window.clearInterval(intervalId);
+    };
+  }, []);
 
   const joinFaction = async (faction: Faction) => {
     setJoinState({ status: "joining" });
@@ -198,6 +243,7 @@ function NetworkPage() {
       const nextIdentity = toNetworkIdentity(data);
       storeNetworkIdentity(nextIdentity);
       setIdentity(nextIdentity);
+      setFactionCounts(toFactionCounts(data.counts));
       setJoinState({ status: "idle" });
     } catch (error) {
       setJoinState({
@@ -216,6 +262,7 @@ function NetworkPage() {
       <section className="tlhn-network-layout" aria-labelledby="network-title">
         <FactionColumn
           accent="hater"
+          count={factionCounts.ai_haters}
           faction="ai_haters"
           identity={identity?.faction === "ai_haters" ? identity : null}
           isActive={identity?.faction === "ai_haters"}
@@ -248,6 +295,7 @@ function NetworkPage() {
         </section>
         <FactionColumn
           accent="lover"
+          count={factionCounts.ai_lovers}
           faction="ai_lovers"
           identity={identity?.faction === "ai_lovers" ? identity : null}
           isActive={identity?.faction === "ai_lovers"}
@@ -304,6 +352,23 @@ function CountdownUnit({ label, minDigits, value }: CountdownUnitProps) {
         {formatCountdownValue(value, minDigits)}
       </span>
       <span className="tlhn-countdown-unit-label">{label}</span>
+    </div>
+  );
+}
+
+interface FactionTallyDisplayProps {
+  accent: "hater" | "lover";
+  count: number;
+  faction: Faction;
+}
+
+function FactionTallyDisplay({ accent, count, faction }: FactionTallyDisplayProps) {
+  return (
+    <div className={`tlhn-faction-tally tlhn-faction-tally-${accent}`}>
+      <span className="tlhn-faction-tally-label">
+        {FACTION_DISPLAY_NAMES[faction]} online
+      </span>
+      <strong className="tlhn-faction-tally-value">{formatFactionCount(count)}</strong>
     </div>
   );
 }
@@ -703,12 +768,24 @@ function toNetworkIdentity(response: FactionJoinResponse): NetworkIdentity {
   };
 }
 
+function toFactionCounts(counts: FactionCounts): FactionCounts {
+  return {
+    ai_haters: normalizeFactionCount(counts.ai_haters),
+    ai_lovers: normalizeFactionCount(counts.ai_lovers),
+  };
+}
+
+function normalizeFactionCount(count: number): number {
+  return Number.isFinite(count) && count >= 0 ? count : 0;
+}
+
 function isFaction(value: unknown): value is Faction {
   return typeof value === "string" && FACTIONS.includes(value as Faction);
 }
 
 interface FactionColumnProps {
   accent: "hater" | "lover";
+  count: number;
   faction: Faction;
   identity: NetworkIdentity | null;
   isActive: boolean;
@@ -720,6 +797,7 @@ interface FactionColumnProps {
 
 function FactionColumn({
   accent,
+  count,
   faction,
   identity,
   isActive,
@@ -738,6 +816,7 @@ function FactionColumn({
       <h2 id={`${faction}-title`} className="tlhn-faction-title">
         {FACTION_DISPLAY_NAMES[faction]}
       </h2>
+      <FactionTallyDisplay accent={accent} count={count} faction={faction} />
       <div className="tlhn-faction-meter" aria-hidden="true" />
       <ul className="tlhn-faction-status">
         {statusLines.map((line) => (
@@ -835,4 +914,8 @@ function getCountdownParts(deadlineMs: number, now: number) {
 
 function formatCountdownValue(value: number, minDigits: number): string {
   return String(value).padStart(minDigits, "0");
+}
+
+function formatFactionCount(count: number): string {
+  return new Intl.NumberFormat("en-US").format(count);
 }

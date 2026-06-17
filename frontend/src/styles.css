@@ -189,6 +189,35 @@
     @apply text-lover-500 text-glow-lover;
   }
 
+  .tlhn-faction-tally {
+    @apply relative z-10 mt-5 rounded-lg border bg-tlhn-void/70 p-4 text-center font-terminal shadow-panel-glitch;
+  }
+
+  .tlhn-faction-tally-hater {
+    @apply border-hater-500/35;
+  }
+
+  .tlhn-faction-tally-lover {
+    @apply border-lover-500/35;
+  }
+
+  .tlhn-faction-tally-label {
+    @apply block text-xs font-bold uppercase text-tlhn-ash;
+  }
+
+  .tlhn-faction-tally-value {
+    @apply mt-2 block text-5xl font-black leading-none sm:text-6xl;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tlhn-faction-tally-hater .tlhn-faction-tally-value {
+    @apply text-hater-500 text-glow-hater;
+  }
+
+  .tlhn-faction-tally-lover .tlhn-faction-tally-value {
+    @apply text-lover-500 text-glow-lover;
+  }
+
   .tlhn-faction-meter {
     @apply relative z-10 mt-6 h-2 overflow-hidden rounded bg-tlhn-static;
   }
