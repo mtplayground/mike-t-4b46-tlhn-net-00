@@ -9,6 +9,10 @@ Express backend, and a shared package for cross-app contracts.
 - `backend/` - Express API server
 - `shared/` - shared TypeScript constants and DTOs
 
+The frontend uses Tailwind theme tokens for the TLHN dark/glitch visual system,
+including Hater red, Lover blue, neon glow utilities, scanlines, and terminal
+font styles.
+
 ## Commands
 
 Install dependencies:
