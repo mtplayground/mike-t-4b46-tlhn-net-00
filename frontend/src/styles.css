@@ -382,6 +382,10 @@
     @apply rounded border border-tlhn-bone/10 bg-tlhn-panel/80 p-3;
   }
 
+  .tlhn-chat-history-status {
+    @apply rounded border border-tlhn-bone/10 bg-tlhn-void/70 px-3 py-2 text-xs uppercase text-tlhn-ash;
+  }
+
   .tlhn-chat-panel-hater .tlhn-chat-message {
     @apply border-hater-500/20;
   }
