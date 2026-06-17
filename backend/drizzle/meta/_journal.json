@@ -8,6 +8,13 @@
       "when": 1781654979520,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1781655492281,
+      "tag": "0001_create_core_tables",
+      "breakpoints": true
     }
   ]
 }
