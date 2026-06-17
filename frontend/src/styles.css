@@ -28,6 +28,16 @@
 @layer components {
   .tlhn-screen {
     @apply relative grid min-h-screen overflow-hidden bg-tlhn-void bg-tlhn-grunge px-6 py-10 text-tlhn-bone;
+    background-color: #05060a;
+    background-image:
+      linear-gradient(115deg, rgba(255, 48, 72, 0.1), transparent 32%),
+      linear-gradient(245deg, rgba(47, 143, 255, 0.08), transparent 38%),
+      repeating-linear-gradient(
+        135deg,
+        rgba(255, 255, 255, 0.035) 0 1px,
+        transparent 1px 17px
+      ),
+      linear-gradient(180deg, #05060a 0%, #10131b 48%, #06070b 100%);
     place-items: center;
   }
 
@@ -39,8 +49,9 @@
   .tlhn-screen::after {
     @apply pointer-events-none absolute inset-0 content-[''];
     background:
-      linear-gradient(90deg, rgba(255, 48, 72, 0.08), transparent 22%),
-      linear-gradient(270deg, rgba(47, 143, 255, 0.08), transparent 22%);
+      linear-gradient(90deg, rgba(255, 48, 72, 0.1), transparent 20%),
+      linear-gradient(270deg, rgba(47, 143, 255, 0.09), transparent 22%),
+      radial-gradient(ellipse at center, transparent 38%, rgba(0, 0, 0, 0.62) 100%);
   }
 
   .tlhn-panel {
@@ -77,5 +88,100 @@
 
   .tlhn-page-panel {
     @apply w-full max-w-[860px] rounded-lg border border-tlhn-bone/15 bg-tlhn-panel/85 p-7 shadow-panel-glitch backdrop-blur-sm sm:p-9;
+  }
+
+  .tlhn-logo-stage {
+    @apply relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center justify-center text-center;
+    min-height: min(680px, calc(100vh - 10rem));
+  }
+
+  .tlhn-logo-stage::before,
+  .tlhn-logo-stage::after {
+    @apply pointer-events-none absolute inset-x-0 mx-auto content-[''];
+  }
+
+  .tlhn-logo-stage::before {
+    top: 18%;
+    width: min(68rem, 94vw);
+    height: 18rem;
+    border: 1px solid rgba(255, 48, 72, 0.2);
+    background:
+      linear-gradient(90deg, transparent, rgba(255, 48, 72, 0.08), transparent),
+      repeating-linear-gradient(
+        0deg,
+        rgba(242, 245, 248, 0.05) 0 1px,
+        transparent 1px 10px
+      );
+    box-shadow:
+      inset 0 0 60px rgba(255, 48, 72, 0.08),
+      0 0 72px rgba(255, 48, 72, 0.14);
+    transform: skewY(-2deg);
+  }
+
+  .tlhn-logo-stage::after {
+    top: 48%;
+    width: min(46rem, 82vw);
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 48, 72, 0.8),
+      rgba(242, 245, 248, 0.65),
+      transparent
+    );
+    box-shadow:
+      0 0 22px rgba(255, 48, 72, 0.75),
+      0 0 54px rgba(255, 48, 72, 0.35);
+  }
+
+  .tlhn-neon-logo {
+    @apply relative m-0 font-terminal font-black uppercase leading-none text-hater-500;
+    font-size: clamp(5rem, 22vw, 17rem);
+    line-height: 0.78;
+    text-shadow:
+      0 0 4px rgba(255, 131, 146, 0.95),
+      0 0 18px rgba(255, 48, 72, 0.95),
+      0 0 42px rgba(255, 48, 72, 0.72),
+      0 0 96px rgba(255, 48, 72, 0.45);
+    filter: drop-shadow(0 0 28px rgba(255, 48, 72, 0.44));
+  }
+
+  .tlhn-neon-logo span {
+    @apply relative inline-block;
+  }
+
+  .tlhn-neon-logo span::before,
+  .tlhn-neon-logo span::after {
+    @apply absolute inset-0 content-[attr(data-text)];
+  }
+
+  .tlhn-neon-logo span::before {
+    color: rgba(47, 143, 255, 0.26);
+    transform: translate(-0.035em, 0.018em);
+    clip-path: inset(18% 0 58% 0);
+  }
+
+  .tlhn-neon-logo span::after {
+    color: rgba(242, 245, 248, 0.2);
+    transform: translate(0.035em, -0.014em);
+    clip-path: inset(60% 0 12% 0);
+  }
+
+  .tlhn-logo-subtitle {
+    @apply relative mt-5 font-terminal text-xl font-bold uppercase text-tlhn-bone sm:text-2xl md:text-3xl;
+    text-shadow:
+      0 0 8px rgba(242, 245, 248, 0.72),
+      0 0 22px rgba(255, 48, 72, 0.5);
+  }
+
+  .tlhn-logo-subtitle::before,
+  .tlhn-logo-subtitle::after {
+    @apply mx-3 inline-block h-px w-8 align-middle content-[''] sm:w-16;
+    background: rgba(255, 48, 72, 0.75);
+    box-shadow: 0 0 16px rgba(255, 48, 72, 0.85);
+  }
+
+  .tlhn-logo-signal {
+    @apply relative mt-5 max-w-2xl font-terminal text-sm uppercase text-tlhn-ash sm:text-base;
   }
 }
