@@ -1,0 +1,33 @@
+{
+  "name": "tlhn-network",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "shared"
+  ],
+  "scripts": {
+    "dev": "concurrently -n shared,backend,frontend -c cyan,green,magenta \"npm run dev -w @tlhn/shared\" \"npm run dev -w @tlhn/backend\" \"npm run dev -w @tlhn/frontend\"",
+    "build": "npm run build -w @tlhn/shared && npm run build -w @tlhn/backend && npm run build -w @tlhn/frontend",
+    "start": "npm run start -w @tlhn/backend",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck -w @tlhn/shared && npm run typecheck -w @tlhn/backend && npm run typecheck -w @tlhn/frontend",
+    "test": "npm run typecheck"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.29.0",
+    "concurrently": "^9.2.0",
+    "eslint": "^9.29.0",
+    "globals": "^16.2.0",
+    "prettier": "^3.5.3",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.34.1"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
