@@ -374,7 +374,8 @@
   }
 
   .tlhn-chat-list {
-    @apply m-0 grid h-80 max-h-80 list-none gap-3 overflow-y-auto overscroll-contain p-0 pr-1 pt-3;
+    @apply m-0 grid list-none gap-3 overflow-y-auto overscroll-contain p-0 pr-1 pt-3;
+    max-height: calc(15 * 4rem);
   }
 
   .tlhn-chat-message {
