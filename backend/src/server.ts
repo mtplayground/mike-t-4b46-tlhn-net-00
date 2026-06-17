@@ -7,6 +7,7 @@ import { checkDatabaseHealth } from "./db/health.js";
 const config = getServerConfig();
 const database = createDatabaseClient(config);
 const app = createApp({
+  db: database.db,
   checkDatabaseHealth: () => checkDatabaseHealth(database.pool),
 });
 
