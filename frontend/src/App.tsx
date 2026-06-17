@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type FormEvent,
   type MouseEvent,
@@ -49,6 +50,9 @@ const HUMAN_COLLAPSE_STORY_LINES = [
 const NETWORK_IDENTITY_STORAGE_KEY = "tlhn_network_identity";
 const DISPLAY_NAME_PATTERN = /^[a-z][a-z0-9]*_[a-z0-9]{5}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const CHAT_PAGE_SIZE = 25;
+const CHAT_HISTORY_SCROLL_THRESHOLD_PX = 48;
+const CHAT_BOTTOM_SCROLL_THRESHOLD_PX = 80;
 const INITIAL_FACTION_COUNTS: FactionCounts = {
   ai_haters: 0,
   ai_lovers: 0,
@@ -531,8 +535,15 @@ interface ChatPanelProps {
 
 function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
+  const messagesRef = useRef<MessageResponse[]>([]);
+  const messageListRef = useRef<HTMLOListElement | null>(null);
+  const historyAbortControllerRef = useRef<AbortController | null>(null);
+  const isChatPanelMountedRef = useRef(true);
+  const isLoadingHistoryRef = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [hasMoreHistory, setHasMoreHistory] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -540,17 +551,28 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
 
     const loadMessages = async () => {
       try {
-        const params = new URLSearchParams({ faction });
-        const response = await fetch(`/api/messages?${params.toString()}`, {
+        const currentMessages = messagesRef.current;
+        const wasEmpty = currentMessages.length === 0;
+        const wasNearBottom = isMessageListScrolledNearBottom(messageListRef.current);
+        const latestMessageId = currentMessages.at(-1)?.id ?? 0;
+        const data = await fetchMessagesPage({
+          faction,
           signal: abortController.signal,
         });
+        const latestMessages = toOldestFirst(data.messages);
+        const hasNewMessages = latestMessages.some(
+          (message) => message.id > latestMessageId,
+        );
 
-        if (!response.ok) {
-          throw new Error(`Message fetch failed with status ${response.status}`);
+        updateMessages((previousMessages) =>
+          mergeMessagesOldestFirst(previousMessages, latestMessages),
+        );
+        if (wasEmpty) {
+          setHasMoreHistory(data.has_more);
+          scrollMessageListToBottom(messageListRef);
+        } else if (hasNewMessages && wasNearBottom) {
+          scrollMessageListToBottom(messageListRef);
         }
-
-        const data = (await response.json()) as ListMessagesResponse;
-        setMessages(data.messages);
         setStatus("ready");
         setErrorMessage(undefined);
         setNow(Date.now());
@@ -579,9 +601,96 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
   }, [faction, refreshToken]);
 
   useEffect(() => {
+    return () => {
+      isChatPanelMountedRef.current = false;
+      historyAbortControllerRef.current?.abort();
+      isLoadingHistoryRef.current = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const intervalId = window.setInterval(() => setNow(Date.now()), 60_000);
     return () => window.clearInterval(intervalId);
   }, []);
+
+  const updateMessages = (
+    updater: (previousMessages: MessageResponse[]) => MessageResponse[],
+  ) => {
+    setMessages((previousMessages) => {
+      const nextMessages = updater(previousMessages);
+      messagesRef.current = nextMessages;
+      return nextMessages;
+    });
+  };
+
+  const loadOlderMessages = async () => {
+    if (isLoadingHistoryRef.current || !hasMoreHistory) {
+      return;
+    }
+
+    const oldestLoadedMessageId = messagesRef.current[0]?.id;
+    if (!oldestLoadedMessageId) {
+      return;
+    }
+
+    const listElement = messageListRef.current;
+    const previousScrollHeight = listElement?.scrollHeight ?? 0;
+    const previousScrollTop = listElement?.scrollTop ?? 0;
+
+    isLoadingHistoryRef.current = true;
+    setIsLoadingHistory(true);
+
+    const abortController = new AbortController();
+    historyAbortControllerRef.current = abortController;
+
+    try {
+      const data = await fetchMessagesPage({
+        beforeId: oldestLoadedMessageId,
+        faction,
+        signal: abortController.signal,
+      });
+      const olderMessages = toOldestFirst(data.messages);
+
+      updateMessages((previousMessages) =>
+        mergeMessagesOldestFirst(olderMessages, previousMessages),
+      );
+      setHasMoreHistory(data.has_more);
+      restoreMessageListScrollPosition(
+        messageListRef,
+        previousScrollHeight,
+        previousScrollTop,
+      );
+      setErrorMessage(undefined);
+    } catch (error) {
+      if (abortController.signal.aborted) {
+        return;
+      }
+
+      setStatus("error");
+      setErrorMessage(
+        error instanceof Error ? error.message : "Message history fetch failed",
+      );
+    } finally {
+      if (historyAbortControllerRef.current === abortController) {
+        historyAbortControllerRef.current = null;
+        isLoadingHistoryRef.current = false;
+        if (isChatPanelMountedRef.current) {
+          setIsLoadingHistory(false);
+        }
+      }
+    }
+  };
+
+  const handleMessageListScroll = () => {
+    const listElement = messageListRef.current;
+    if (
+      listElement &&
+      listElement.scrollTop <= CHAT_HISTORY_SCROLL_THRESHOLD_PX &&
+      hasMoreHistory
+    ) {
+      void loadOlderMessages();
+    }
+  };
 
   return (
     <section className={`tlhn-chat-panel tlhn-chat-panel-${accent}`}>
@@ -603,7 +712,18 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
             : "No transmissions yet. Hold the channel."}
         </p>
       ) : (
-        <ol className="tlhn-chat-list" aria-live="polite">
+        <ol
+          className="tlhn-chat-list"
+          aria-busy={isLoadingHistory}
+          aria-live="polite"
+          onScroll={handleMessageListScroll}
+          ref={messageListRef}
+        >
+          {isLoadingHistory && (
+            <li className="tlhn-chat-history-status">
+              &gt;_ Loading older transmissions...
+            </li>
+          )}
           {messages.map((message) => (
             <li className="tlhn-chat-message" key={message.id}>
               <div className="tlhn-chat-meta">
@@ -619,6 +739,96 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
       )}
     </section>
   );
+}
+
+interface FetchMessagesPageOptions {
+  beforeId?: number;
+  faction: Faction;
+  signal?: AbortSignal;
+}
+
+async function fetchMessagesPage({
+  beforeId,
+  faction,
+  signal,
+}: FetchMessagesPageOptions): Promise<ListMessagesResponse> {
+  const params = new URLSearchParams({
+    faction,
+    limit: String(CHAT_PAGE_SIZE),
+  });
+
+  if (beforeId !== undefined) {
+    params.set("before_id", String(beforeId));
+  }
+
+  const response = await fetch(`/api/messages?${params.toString()}`, {
+    signal,
+  });
+
+  if (!response.ok) {
+    throw new Error(`Message fetch failed with status ${response.status}`);
+  }
+
+  return (await response.json()) as ListMessagesResponse;
+}
+
+function toOldestFirst(messages: MessageResponse[]): MessageResponse[] {
+  return [...messages].sort((left, right) => left.id - right.id);
+}
+
+function mergeMessagesOldestFirst(
+  leftMessages: MessageResponse[],
+  rightMessages: MessageResponse[],
+): MessageResponse[] {
+  const messagesById = new Map<number, MessageResponse>();
+
+  for (const message of [...leftMessages, ...rightMessages]) {
+    messagesById.set(message.id, message);
+  }
+
+  return [...messagesById.values()].sort((left, right) => left.id - right.id);
+}
+
+function isMessageListScrolledNearBottom(
+  listElement: HTMLOListElement | null,
+): boolean {
+  if (!listElement) {
+    return true;
+  }
+
+  return (
+    listElement.scrollHeight - listElement.scrollTop - listElement.clientHeight <=
+    CHAT_BOTTOM_SCROLL_THRESHOLD_PX
+  );
+}
+
+function scrollMessageListToBottom(listRef: {
+  current: HTMLOListElement | null;
+}): void {
+  window.requestAnimationFrame(() => {
+    const listElement = listRef.current;
+
+    if (listElement) {
+      listElement.scrollTop = listElement.scrollHeight;
+    }
+  });
+}
+
+function restoreMessageListScrollPosition(
+  listRef: {
+    current: HTMLOListElement | null;
+  },
+  previousScrollHeight: number,
+  previousScrollTop: number,
+): void {
+  window.requestAnimationFrame(() => {
+    const listElement = listRef.current;
+
+    if (listElement) {
+      listElement.scrollTop =
+        listElement.scrollHeight - previousScrollHeight + previousScrollTop;
+    }
+  });
 }
 
 interface MessageComposerProps {
