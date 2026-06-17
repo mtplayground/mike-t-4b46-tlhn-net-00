@@ -67,7 +67,7 @@ function parseIsoDate(
 
 export function getServerConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   return {
-    databaseUrl: requireEnv(env.DATABASE_URL, "DATABASE_URL"),
+    databaseUrl: normalizeDatabaseUrl(requireEnv(env.DATABASE_URL, "DATABASE_URL")),
     host: env.HOST || "0.0.0.0",
     port: parsePort(env.PORT),
     nodeEnv: env.NODE_ENV || "development",
@@ -82,4 +82,17 @@ export function getServerConfig(env: NodeJS.ProcessEnv = process.env): ServerCon
       DEFAULT_COUNTDOWN_DEADLINE_ISO,
     ),
   };
+}
+
+function normalizeDatabaseUrl(value: string): string {
+  const url = new URL(value);
+
+  if (
+    url.searchParams.get("sslmode") === "require" &&
+    !url.searchParams.has("uselibpqcompat")
+  ) {
+    url.searchParams.set("uselibpqcompat", "true");
+  }
+
+  return url.toString();
 }

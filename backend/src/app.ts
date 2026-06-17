@@ -9,13 +9,18 @@ import express, {
 } from "express";
 import helmet from "helmet";
 import { PRODUCT_NAME, type HealthResponse } from "@tlhn/shared";
+import type { DatabaseHealth } from "./db/health.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const frontendDistPath = path.resolve(__dirname, "../../frontend/dist");
 
-export function createApp(): express.Express {
+export interface AppDependencies {
+  checkDatabaseHealth: () => Promise<DatabaseHealth>;
+}
+
+export function createApp(dependencies: AppDependencies): express.Express {
   const app = express();
 
   app.disable("x-powered-by");
@@ -24,12 +29,20 @@ export function createApp(): express.Express {
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
 
-  app.get("/api/health", (_req: Request, res: Response<HealthResponse>) => {
-    res.json({
-      status: "ok",
-      service: "api",
-      product: PRODUCT_NAME,
-    });
+  app.get("/api/health", async (_req: Request, res: Response<HealthResponse>, next) => {
+    try {
+      const database = await dependencies.checkDatabaseHealth();
+      const status = database.status === "ok" ? "ok" : "error";
+
+      res.status(status === "ok" ? 200 : 503).json({
+        status,
+        service: "api",
+        product: PRODUCT_NAME,
+        database,
+      });
+    } catch (error) {
+      next(error);
+    }
   });
 
   app.use(express.static(frontendDistPath));

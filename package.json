@@ -11,6 +11,9 @@
   "scripts": {
     "dev": "concurrently -n shared,backend,frontend -c cyan,green,magenta \"npm run dev -w @tlhn/shared\" \"npm run dev -w @tlhn/backend\" \"npm run dev -w @tlhn/frontend\"",
     "build": "npm run build -w @tlhn/shared && npm run build -w @tlhn/backend && npm run build -w @tlhn/frontend",
+    "db:generate": "npm run db:generate -w @tlhn/backend",
+    "db:migrate": "npm run db:migrate -w @tlhn/backend",
+    "db:studio": "npm run db:studio -w @tlhn/backend",
     "start": "npm run start -w @tlhn/backend",
     "lint": "eslint .",
     "format": "prettier --write .",
