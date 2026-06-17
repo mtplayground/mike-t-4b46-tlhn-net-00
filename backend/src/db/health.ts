@@ -28,7 +28,15 @@ export async function checkDatabaseHealth(pool: PgPool): Promise<DatabaseHealth>
     console.error("PostgreSQL health check failed", error);
     return {
       status: "error",
-      message: "PostgreSQL health check failed",
+      message: `PostgreSQL health check failed: ${formatHealthError(error)}`,
     };
   }
+}
+
+function formatHealthError(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "unknown error";
 }
