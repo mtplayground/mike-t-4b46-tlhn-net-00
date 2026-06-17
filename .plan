@@ -1,55 +1,77 @@
-# Architecture plan for Issues #51-#53
+# Architecture plan for Issues #57-#60
 
-Product: The Last Human Network (TLHN), a TypeScript npm-workspace monorepo with a Vite React frontend, Express backend, shared DTO/constants package, Tailwind styling, and PostgreSQL persistence.
+Product: The Last Human Network (TLHN), a TypeScript npm-workspace monorepo with a Vite React frontend, Express backend, shared DTO/contracts package, Tailwind styling, Drizzle ORM, and PostgreSQL persistence.
 
 ## Relevant module structure
 
 - `frontend/src/App.tsx`
-  - Contains the SPA shell, landing page, `/network` route, `CountdownTimer`, `CountdownUnit`, `ChatPanel`, `FactionColumn`, message composer, and UI helpers.
-  - Issues #51-#53 are frontend-only adjustments in this file's React markup/helper usage.
+  - Owns the manual SPA routing, `/network` layout, `CountdownTimer`, `CountdownUnit`, `FactionColumn`, `ChatPanel`, `MessageComposer`, local identity state, polling, and UI helpers.
+  - Issues #57, #59, and #60 require coordinated changes here so the countdown can move out of the center utility column and chat feeds can support cursor-based upward history loading.
 - `frontend/src/styles.css`
-  - Tailwind `@layer components` definitions for countdown tiles, chat panels/lists, and feed headers.
-  - Primary styling target for countdown reflow and chat viewport constraints.
-- `frontend/tailwind.config.ts`
-  - Existing theme tokens and utilities; no new dependency expected.
-- `shared/src/*`, `backend/src/*`, and database schema
-  - No API, DTO, persistence, or migration changes expected for this batch.
+  - Tailwind component layer for the three-column network grid, countdown, chat panels, and scrollable message list.
+  - Main target for Issue #57's full-width countdown band and Issue #58's taller chat viewport.
+- `shared/src/messages.ts`
+  - Shared Zod query schema and DTOs for `GET /api/messages`.
+  - Issue #59 should update this first to add `limit`, `before_id`, and `has_more` in the response contract.
+- `backend/src/routes/messages.ts`
+  - Express route backed by Drizzle/PostgreSQL for listing and creating messages.
+  - Issue #59 should implement cursor filtering, `limit + 1` fetches, and `has_more` computation here.
+- `backend/src/app.test.ts` and `backend/src/e2e.test.ts`
+  - Backend integration/e2e coverage; Issue #59 should add pagination tests with more than 25 messages and a `before_id` page turn.
+- `backend/src/db/schema.ts`
+  - Existing `messages` table has `id`, `faction`, `createdAt`, and indexes on faction/createdAt. No migration is expected for cursor pagination because `id` already exists and is the cursor.
 
 ## Issue plan
 
-### Issue #51: Fix countdown DAYS tile clipping in the narrow center column
+### Issue #57: Move the countdown into a full-width band spanning the network page
 
-- Adjust countdown layout/classes in `frontend/src/styles.css` and, only if needed, the `CountdownTimer`/`CountdownUnit` JSX in `frontend/src/App.tsx`.
-- Preserve the existing four-unit countdown semantics (`DAYS`, `HRS`, `MINS`, `SECS`).
-- Make the DAYS tile wide enough for 100+ day values, use tabular numerals, prevent wrapping, and remove any clipping that cuts off the rendered number.
-- Prefer CSS grid changes that keep the center utility column responsive rather than hard-coding global page width.
+- In `NetworkPage`, render `<CountdownTimer />` as its own full-width grid item rather than inside `.tlhn-network-utility`.
+- Keep the heading text `TIME LEFT UNTIL AI DOMINATES THE WORLD` with the countdown component.
+- Update `.tlhn-network-layout` / countdown CSS so the countdown band spans all columns on large screens and the page width on smaller screens.
+- Remove or replace the current early `min-width: 1280px` four-column countdown media rule that causes clipping/overflow.
+- Preserve existing countdown config from `clientConfig.countdownDeadlineIso` and visual TLHN styling.
 
-### Issue #52: Remove the "5s poll" label from both chat feed headers
+### Issue #58: Size chat feed viewport to show ~15 messages before scrolling
 
-- Update `ChatPanel` in `frontend/src/App.tsx` to remove the polling interval `<span>` from the feed header.
-- Remove the now-unused `formatPollingInterval` helper from `App.tsx`.
-- Keep actual polling behavior unchanged; `clientConfig.pollingIntervalMs` should still drive message refresh intervals.
-- If header styling assumed a right-aligned label, simplify CSS in `frontend/src/styles.css` without changing panel identity or titles.
+- Update `.tlhn-chat-list` in `frontend/src/styles.css` by removing the short fixed `h-80`-style constraint and using a max height around fifteen rows, e.g. `max-height: calc(15 * 4rem)`.
+- Keep `overflow-y-auto` and add/keep `overscroll-contain` so only the feed scrolls when history grows.
+- Confirm the surrounding `.tlhn-chat-panel` layout still allows the message composer and faction column to fit responsively.
 
-### Issue #53: Constrain chat feed to a fixed-height scrollable viewport
+### Issue #59: Add cursor-based pagination to the messages list API
 
-- Adjust chat feed styles in `frontend/src/styles.css`, especially `.tlhn-chat-list` and surrounding chat-panel containers.
-- Ensure heavy posting scrolls inside each faction feed with explicit max/fixed height, `overflow-y-auto`, and `overscroll-contain`.
-- Preserve backend's existing 50-message limit and frontend polling behavior.
-- Avoid changing message DTOs, API routes, or persistence.
+- Update `shared/src/messages.ts`:
+  - Extend `listMessagesQuerySchema` with `limit` and `before_id` query params, parsing string query values into bounded integers.
+  - Add `has_more: boolean` to `ListMessagesResponse`.
+- Update `backend/src/routes/messages.ts`:
+  - Default `limit` to 25 and cap at 50.
+  - If `before_id` is present, filter messages to ids older than the cursor for the selected faction/global query.
+  - Fetch `limit + 1`, return only `limit`, and set `has_more` based on the extra row.
+  - Preserve newest-first API ordering because Issue #60 can transform display order client-side.
+- Update tests to verify default size, max cap, `before_id`, `has_more`, invalid query validation, and faction isolation.
+
+### Issue #60: Scroll-up infinite history loading in chat feeds
+
+- Refactor `ChatPanel` state in `frontend/src/App.tsx` to track loaded messages, loading states, pagination cursor, and `hasMore`.
+- Initial load should request the latest 25 messages for the faction.
+- Render feed oldest-to-newest so the newest messages sit at the bottom while the API can remain newest-first.
+- Add an `onScroll` handler/ref on `.tlhn-chat-list`; when the user nears the top and `hasMore` is true, request `before_id` equal to the oldest loaded id.
+- Prepend older messages while preserving scroll position by measuring scroll height before/after insertion.
+- Keep live polling active for new messages, dedupe by `id`, and append new arrivals without disrupting older-history loads.
+- Guard against concurrent history fetches and abort/cancel effects on unmount or faction changes.
 
 ## Dependencies and sequencing
 
-- The issues have no hard dependencies and can be implemented independently.
-- Recommended sequence:
-  1. Issue #52 first because it removes markup/helper surface area from `ChatPanel`.
-  2. Issue #53 next because it refines the same chat panel/list styling.
-  3. Issue #51 can be done before or after chat work; it touches the countdown utility area, not chat data flow.
+1. Issue #57 can be implemented independently and is frontend layout-only.
+2. Issue #58 can be implemented independently but should be validated again after Issue #60 because infinite history depends on the same scroll container.
+3. Issue #59 must precede Issue #60 because the frontend infinite-scroll feature depends on `limit`, `before_id`, and `has_more` from the API/shared DTOs.
+4. Issue #60 should be last; it consumes the Issue #59 contract and should preserve Issue #58's viewport behavior.
 
 ## Key design decisions
 
-- Keep the changes frontend-only unless tests reveal a type/lint fallout.
-- Continue using existing Tailwind component classes and TLHN visual tokens; do not introduce UI libraries.
-- Do not rename product/faction labels; use `The Last Human Network`, `TLHN`, `AI Haters`, and `AI Lovers` from existing shared conventions.
-- Avoid database or API changes. PostgreSQL-backed messages, tallies, and subscriptions remain as-is.
-- Validation for each implementation should include `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when feasible.
+- Keep product/faction language from `PRODUCT.md` and shared constants: `The Last Human Network`, `TLHN`, `AI Haters`, and `AI Lovers`.
+- Use PostgreSQL/Drizzle already present in the app; no new database technology or migration is needed for these issues.
+- Keep cursor pagination based on monotonic message `id` rather than timestamp to avoid duplicate/ambiguous cursors.
+- Prefer shared schema/type changes first for API work, then backend implementation, then frontend consumption.
+- Maintain existing security/validation patterns: Zod for request validation, JSON errors, and backend tests for API changes.
+- Avoid adding new frontend dependencies; React hooks/refs are sufficient for scroll preservation and polling coordination.
+- Validation after each issue should include `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when feasible.
