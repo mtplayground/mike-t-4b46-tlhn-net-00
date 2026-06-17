@@ -69,6 +69,13 @@ h1 {
   font-size: 1.05rem;
 }
 
+.config-note {
+  margin: 12px 0 0;
+  color: rgba(245, 247, 251, 0.6);
+  font-family: "Courier New", ui-monospace, monospace;
+  font-size: 0.9rem;
+}
+
 .health-link {
   display: inline-flex;
   align-items: center;

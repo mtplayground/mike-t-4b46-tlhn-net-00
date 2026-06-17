@@ -1,4 +1,5 @@
 import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from "@tlhn/shared";
+import { clientConfig } from "./config";
 
 export function App() {
   return (
@@ -8,6 +9,10 @@ export function App() {
         <h1 id="app-title">{PRODUCT_NAME}</h1>
         <p className="lede">
           React client and Express API are ready for the next implementation issue.
+        </p>
+        <p className="config-note">
+          Polling defaults to {clientConfig.pollingIntervalMs}ms. Countdown target is{" "}
+          {clientConfig.countdownDeadlineIso}.
         </p>
         <ApiStatus />
       </section>
