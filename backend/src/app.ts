@@ -11,6 +11,7 @@ import helmet from "helmet";
 import { PRODUCT_NAME, type HealthResponse } from "@tlhn/shared";
 import type { AppDatabase } from "./db/client.js";
 import type { DatabaseHealth } from "./db/health.js";
+import { createFactionsRouter } from "./routes/factions.js";
 import { createMessagesRouter } from "./routes/messages.js";
 import type { MessagePostRateLimiter } from "./services/messagePostRateLimit.js";
 
@@ -33,6 +34,8 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.use(compression());
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
+
+  app.use("/api/factions", createFactionsRouter({ db: dependencies.db }));
 
   app.use(
     "/api/messages",
