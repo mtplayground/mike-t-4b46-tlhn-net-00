@@ -42,4 +42,12 @@ export default tseslint.config(
       globals: globals.node,
     },
   },
+  {
+    files: ["**/*.cjs"],
+    languageOptions: {
+      ecmaVersion: "latest",
+      sourceType: "commonjs",
+      globals: globals.node,
+    },
+  },
 );

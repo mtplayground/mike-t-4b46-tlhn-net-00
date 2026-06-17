@@ -1,95 +1,53 @@
-:root {
-  color: #f5f7fb;
-  background: #090a0f;
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-  font-synthesis: none;
-  line-height: 1.5;
-  text-rendering: optimizeLegibility;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color: theme("colors.tlhn.bone");
+    background: theme("colors.tlhn.void");
+    font-family: theme("fontFamily.sans");
+    font-synthesis: none;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    min-width: 320px;
+    min-height: 100vh;
+    margin: 0;
+    color: theme("colors.tlhn.bone");
+    background: theme("colors.tlhn.void");
+  }
+
+  a {
+    color: inherit;
+  }
 }
 
-* {
-  box-sizing: border-box;
-}
+@layer components {
+  .tlhn-screen {
+    @apply relative grid min-h-screen overflow-hidden bg-tlhn-void bg-tlhn-grunge px-6 py-10 text-tlhn-bone;
+    place-items: center;
+  }
 
-body {
-  margin: 0;
-  min-width: 320px;
-  min-height: 100vh;
-}
+  .tlhn-screen::before {
+    @apply pointer-events-none absolute inset-0 bg-scanlines opacity-35 content-[''];
+    mix-blend-mode: screen;
+  }
 
-a {
-  color: inherit;
-}
+  .tlhn-screen::after {
+    @apply pointer-events-none absolute inset-0 content-[''];
+    background:
+      linear-gradient(90deg, rgba(255, 48, 72, 0.08), transparent 22%),
+      linear-gradient(270deg, rgba(47, 143, 255, 0.08), transparent 22%);
+  }
 
-.app-shell {
-  display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: 24px;
-  background:
-    linear-gradient(135deg, rgba(196, 20, 43, 0.2), transparent 34%),
-    linear-gradient(315deg, rgba(42, 111, 255, 0.2), transparent 36%), #090a0f;
-}
+  .tlhn-panel {
+    @apply relative z-10 w-full max-w-[760px] rounded-lg border border-tlhn-bone/15 bg-tlhn-panel/85 p-8 shadow-panel-glitch backdrop-blur-sm;
+  }
 
-.status-panel {
-  width: min(100%, 720px);
-  border: 1px solid rgba(245, 247, 251, 0.18);
-  border-radius: 8px;
-  padding: 32px;
-  background: rgba(9, 10, 15, 0.82);
-}
-
-.eyebrow {
-  margin: 0 0 8px;
-  color: #ff3048;
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.86rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-}
-
-h1 {
-  margin: 0;
-  font-size: clamp(2.25rem, 8vw, 5.5rem);
-  line-height: 0.95;
-}
-
-.lede {
-  max-width: 48rem;
-  margin: 20px 0 0;
-  color: rgba(245, 247, 251, 0.76);
-  font-size: 1.05rem;
-}
-
-.config-note {
-  margin: 12px 0 0;
-  color: rgba(245, 247, 251, 0.6);
-  font-family: "Courier New", ui-monospace, monospace;
-  font-size: 0.9rem;
-}
-
-.health-link {
-  display: inline-flex;
-  align-items: center;
-  min-height: 44px;
-  margin-top: 28px;
-  border: 1px solid #ff3048;
-  border-radius: 6px;
-  padding: 0 16px;
-  color: #f5f7fb;
-  font-family: "Courier New", ui-monospace, monospace;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.health-link:hover {
-  background: rgba(255, 48, 72, 0.16);
+  .tlhn-terminal-button {
+    @apply mt-7 inline-flex min-h-11 items-center rounded-md border border-hater-500 px-4 font-terminal font-bold text-tlhn-bone no-underline shadow-neon-hater transition duration-150 hover:bg-hater-500/15 focus:outline-none focus:ring-2 focus:ring-hater-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
+  }
 }
