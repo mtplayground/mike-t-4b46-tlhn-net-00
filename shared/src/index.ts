@@ -1,9 +1,16 @@
-export type ServiceStatus = "ok";
+export type ServiceStatus = "ok" | "error";
+
+export interface DatabaseHealthResponse {
+  status: ServiceStatus;
+  latencyMs?: number;
+  message?: string;
+}
 
 export interface HealthResponse {
   status: ServiceStatus;
   service: "api";
   product: "The Last Human Network";
+  database: DatabaseHealthResponse;
 }
 
 export const PRODUCT_NAME = "The Last Human Network";

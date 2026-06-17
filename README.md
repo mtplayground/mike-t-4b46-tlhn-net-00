@@ -35,6 +35,12 @@ Build everything:
 npm run build
 ```
 
+Run database migrations:
+
+```bash
+DATABASE_URL=postgres://... npm run db:migrate
+```
+
 Start the built Express server:
 
 ```bash
