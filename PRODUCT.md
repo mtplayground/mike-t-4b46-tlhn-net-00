@@ -16,12 +16,18 @@ TypeScript DTOs and constants in a monorepo.
   generated `prefix_xxxxx` display name, increments faction tallies, and stores
   the selected faction/name in browser localStorage for the session experience.
 - Faction chat panels poll `/api/messages` about every 5 seconds, show display
-  names, message bodies, and relative timestamps.
+  names, message bodies, and relative timestamps without exposing a polling
+  label in the feed headers.
+- Chat feeds are fixed-height, internally scrollable viewports with overscroll
+  containment so heavy posting stays inside each faction panel; the backend
+  still limits reads to the latest 50 messages.
 - Message composer posts as the selected faction/name, enforces a 30-second
   cooldown in the UI, and handles backend 429 responses gracefully.
 - Live red/blue faction tally displays poll `/api/factions/counts`.
 - Flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
-  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment.
+  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. The
+  DAYS tile is widened/reflowed with tabular no-wrap numerals so 100+ day
+  counts do not clip in the narrow center column.
 - Email subscription form posts to `/api/subscriptions`, validates client-side,
   and shows success, duplicate, and error states.
 
