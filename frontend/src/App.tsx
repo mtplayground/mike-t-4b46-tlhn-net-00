@@ -74,20 +74,18 @@ function AppShell({ children, currentRoute, onNavigate }: AppShellProps) {
 
 function LandingPage() {
   return (
-    <section className="tlhn-page-panel" aria-labelledby="landing-title">
-      <p className="font-terminal text-sm uppercase text-lover-300 text-glow-lover">
-        Signal acquired
-      </p>
+    <section className="tlhn-logo-stage" aria-labelledby="landing-title">
       <h1
         id="landing-title"
-        className="mt-3 max-w-5xl text-[clamp(2.6rem,8vw,6rem)] font-black leading-[0.95] text-tlhn-bone text-glow-terminal"
+        className="tlhn-neon-logo"
+        aria-label={`${PRODUCT_SHORT_NAME}: ${PRODUCT_NAME}`}
       >
-        {PRODUCT_NAME}
+        <span aria-hidden="true" data-text={PRODUCT_SHORT_NAME}>
+          {PRODUCT_SHORT_NAME}
+        </span>
       </h1>
-      <p className="mt-6 max-w-3xl text-lg text-tlhn-bone/75">
-        A dark terminal for the last human signal, split between suspicion and devotion
-        as the network comes online.
-      </p>
+      <p className="tlhn-logo-subtitle">{PRODUCT_NAME.toUpperCase()}</p>
+      <p className="tlhn-logo-signal">Signal acquired across the last human channel.</p>
     </section>
   );
 }
