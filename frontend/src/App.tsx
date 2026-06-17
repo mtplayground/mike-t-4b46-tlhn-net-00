@@ -1,5 +1,10 @@
 import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
-import { PRODUCT_NAME, PRODUCT_SHORT_NAME } from "@tlhn/shared";
+import {
+  FACTION_DISPLAY_NAMES,
+  PRODUCT_NAME,
+  PRODUCT_SHORT_NAME,
+  type Faction,
+} from "@tlhn/shared";
 
 type RoutePath = "/" | "/network";
 
@@ -144,20 +149,72 @@ function EnterNetworkButton({ onNavigate }: EnterNetworkButtonProps) {
 
 function NetworkPage() {
   return (
-    <section className="tlhn-page-panel" aria-labelledby="network-title">
-      <p className="font-terminal text-sm uppercase text-hater-500 text-glow-hater">
-        Signal route
-      </p>
-      <h1
-        id="network-title"
-        className="mt-3 text-[clamp(2.25rem,7vw,5rem)] font-black leading-none text-tlhn-bone text-glow-terminal"
-      >
-        Network
-      </h1>
-      <p className="mt-6 max-w-3xl text-lg text-tlhn-bone/75">
-        Faction terminals are booting under the same fractured signal.
-      </p>
+    <section className="tlhn-network-layout" aria-labelledby="network-title">
+      <FactionColumn
+        accent="hater"
+        faction="ai_haters"
+        kicker="Red channel"
+        statusLines={["Resistance node", "Signal hostility high", "Human-first relay"]}
+      />
+      <section className="tlhn-network-utility" aria-labelledby="network-title">
+        <p className="tlhn-network-kicker">Utility core</p>
+        <h1 id="network-title" className="tlhn-network-title">
+          Network
+        </h1>
+        <div className="tlhn-utility-stack" aria-label="Network utilities">
+          <UtilityLine label="Identity" value="Unassigned" />
+          <UtilityLine label="Countdown" value="Awaiting sync" />
+          <UtilityLine label="Transmission" value="Standby" />
+        </div>
+      </section>
+      <FactionColumn
+        accent="lover"
+        faction="ai_lovers"
+        kicker="Blue channel"
+        statusLines={["Ascension node", "Signal affinity high", "Machine-allied relay"]}
+      />
     </section>
+  );
+}
+
+interface FactionColumnProps {
+  accent: "hater" | "lover";
+  faction: Faction;
+  kicker: string;
+  statusLines: readonly string[];
+}
+
+function FactionColumn({ accent, faction, kicker, statusLines }: FactionColumnProps) {
+  return (
+    <section
+      className={`tlhn-faction-column tlhn-faction-column-${accent}`}
+      aria-labelledby={`${faction}-title`}
+    >
+      <p className="tlhn-network-kicker">{kicker}</p>
+      <h2 id={`${faction}-title`} className="tlhn-faction-title">
+        {FACTION_DISPLAY_NAMES[faction]}
+      </h2>
+      <div className="tlhn-faction-meter" aria-hidden="true" />
+      <ul className="tlhn-faction-status">
+        {statusLines.map((line) => (
+          <li key={line}>{line}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface UtilityLineProps {
+  label: string;
+  value: string;
+}
+
+function UtilityLine({ label, value }: UtilityLineProps) {
+  return (
+    <div className="tlhn-utility-line">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
