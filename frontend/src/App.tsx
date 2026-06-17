@@ -233,6 +233,7 @@ function NetworkPage() {
           <h1 id="network-title" className="tlhn-network-title">
             Network
           </h1>
+          <CountdownTimer />
           <div className="tlhn-utility-stack" aria-label="Network utilities">
             <UtilityLine
               label="Identity"
@@ -264,6 +265,46 @@ function NetworkPage() {
         <FactionSelectionModal joinState={joinState} onJoinFaction={joinFaction} />
       )}
     </>
+  );
+}
+
+function CountdownTimer() {
+  const deadlineMs = Date.parse(clientConfig.countdownDeadlineIso);
+  const [now, setNow] = useState(() => Date.now());
+  const countdown = getCountdownParts(deadlineMs, now);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  return (
+    <section className="tlhn-countdown" aria-label="Countdown timer">
+      <p className="tlhn-countdown-label">TIME LEFT UNTIL AI DOMINATES THE WORLD</p>
+      <div className="tlhn-countdown-grid" role="timer" aria-live="polite">
+        <CountdownUnit label="DAYS" minDigits={4} value={countdown.days} />
+        <CountdownUnit label="HRS" minDigits={2} value={countdown.hours} />
+        <CountdownUnit label="MINS" minDigits={2} value={countdown.minutes} />
+        <CountdownUnit label="SECS" minDigits={2} value={countdown.seconds} />
+      </div>
+    </section>
+  );
+}
+
+interface CountdownUnitProps {
+  label: string;
+  minDigits: number;
+  value: number;
+}
+
+function CountdownUnit({ label, minDigits, value }: CountdownUnitProps) {
+  return (
+    <div className="tlhn-countdown-unit">
+      <span className="tlhn-countdown-value">
+        {formatCountdownValue(value, minDigits)}
+      </span>
+      <span className="tlhn-countdown-unit-label">{label}</span>
+    </div>
   );
 }
 
@@ -775,4 +816,23 @@ function formatRelativeTime(value: string, now: number): string {
   }
 
   return `${minutes}m ago`;
+}
+
+function getCountdownParts(deadlineMs: number, now: number) {
+  const totalSeconds = Math.max(0, Math.floor((deadlineMs - now) / 1000));
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return {
+    days,
+    hours,
+    minutes,
+    seconds,
+  };
+}
+
+function formatCountdownValue(value: number, minDigits: number): string {
+  return String(value).padStart(minDigits, "0");
 }
