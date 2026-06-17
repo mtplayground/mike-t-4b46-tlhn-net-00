@@ -184,16 +184,35 @@
   }
 
   .tlhn-countdown-grid {
-    @apply mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4;
+    @apply mt-3 grid gap-2;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .tlhn-countdown-unit {
     @apply min-w-0 text-center;
   }
 
+  .tlhn-countdown-unit:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .tlhn-countdown-unit:first-child .tlhn-countdown-value {
+    @apply px-4;
+  }
+
   .tlhn-countdown-value {
-    @apply relative grid min-h-14 place-items-center overflow-hidden rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-2 text-2xl font-black text-hater-100 shadow-neon-hater sm:text-3xl;
+    @apply relative grid min-h-14 min-w-0 place-items-center overflow-visible whitespace-nowrap rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-2 text-2xl font-black leading-none text-hater-100 shadow-neon-hater sm:text-3xl;
     font-variant-numeric: tabular-nums;
+  }
+
+  @media (min-width: 640px) and (max-width: 1023px), (min-width: 1280px) {
+    .tlhn-countdown-grid {
+      grid-template-columns: minmax(6.75rem, 1.6fr) repeat(3, minmax(3.25rem, 1fr));
+    }
+
+    .tlhn-countdown-unit:first-child {
+      grid-column: auto;
+    }
   }
 
   .tlhn-countdown-value::before {
