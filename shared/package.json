@@ -10,6 +10,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./factions": {
+      "types": "./dist/factions.d.ts",
+      "default": "./dist/factions.js"
+    },
     "./messages": {
       "types": "./dist/messages.d.ts",
       "default": "./dist/messages.js"
