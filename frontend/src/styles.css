@@ -286,6 +286,18 @@
     @apply border-lover-500 bg-lover-500/10 shadow-neon-lover hover:bg-lover-500/20 focus:outline-none focus:ring-2 focus:ring-lover-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
   }
 
+  .tlhn-message-cooldown {
+    @apply m-0 mt-3 text-xs font-bold uppercase tracking-normal text-tlhn-ash;
+  }
+
+  .tlhn-message-composer-hater .tlhn-message-cooldown {
+    @apply text-hater-300;
+  }
+
+  .tlhn-message-composer-lover .tlhn-message-cooldown {
+    @apply text-lover-300;
+  }
+
   .tlhn-message-composer-error {
     @apply m-0 mt-3 text-xs leading-5 text-hater-300;
   }
