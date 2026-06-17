@@ -272,6 +272,7 @@ function NetworkPage() {
   return (
     <>
       <section className="tlhn-network-layout" aria-labelledby="network-title">
+        <CountdownTimer />
         <FactionColumn
           accent="hater"
           count={factionCounts.ai_haters}
@@ -293,7 +294,6 @@ function NetworkPage() {
             Network
           </h1>
           <NetworkStatusNotice countsState={countsState} />
-          <CountdownTimer />
           <EmailSubscriptionForm />
           <div className="tlhn-utility-stack" aria-label="Network utilities">
             <UtilityLine
