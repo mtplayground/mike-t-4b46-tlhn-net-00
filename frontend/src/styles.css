@@ -217,4 +217,22 @@
   .tlhn-terminal-prompt {
     @apply text-hater-500 text-glow-hater;
   }
+
+  .tlhn-enter-network-button {
+    @apply relative mt-8 inline-flex min-h-12 items-center justify-center gap-3 rounded-md border border-hater-500 bg-tlhn-void/75 px-5 py-3 font-terminal text-sm font-bold uppercase text-tlhn-bone no-underline shadow-neon-hater transition duration-150 hover:bg-hater-500/15 hover:text-hater-50 focus:outline-none focus:ring-2 focus:ring-hater-500 focus:ring-offset-2 focus:ring-offset-tlhn-void sm:text-base;
+  }
+
+  .tlhn-enter-network-button::before {
+    @apply pointer-events-none absolute inset-0 rounded-md content-[''];
+    background: linear-gradient(90deg, rgba(255, 48, 72, 0.18), transparent 48%);
+    mix-blend-mode: screen;
+  }
+
+  .tlhn-enter-network-prompt {
+    @apply relative text-hater-500 text-glow-hater;
+  }
+
+  .tlhn-enter-network-button span {
+    @apply relative;
+  }
 }

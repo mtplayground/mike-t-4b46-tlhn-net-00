@@ -43,7 +43,7 @@ export function App() {
 
   return (
     <AppShell currentRoute={route} onNavigate={navigate}>
-      {route === "/network" ? <NetworkPage /> : <LandingPage />}
+      {route === "/network" ? <NetworkPage /> : <LandingPage onNavigate={navigate} />}
     </AppShell>
   );
 }
@@ -84,7 +84,11 @@ function AppShell({ children, currentRoute, onNavigate }: AppShellProps) {
   );
 }
 
-function LandingPage() {
+interface LandingPageProps {
+  onNavigate: (route: RoutePath) => void;
+}
+
+function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <section className="tlhn-logo-stage" aria-labelledby="landing-title">
       <h1
@@ -99,6 +103,7 @@ function LandingPage() {
       <p className="tlhn-logo-subtitle">{PRODUCT_NAME.toUpperCase()}</p>
       <p className="tlhn-logo-signal">Signal acquired across the last human channel.</p>
       <TerminalStoryBlock />
+      <EnterNetworkButton onNavigate={onNavigate} />
     </section>
   );
 }
@@ -115,6 +120,25 @@ function TerminalStoryBlock() {
         </p>
       ))}
     </section>
+  );
+}
+
+interface EnterNetworkButtonProps {
+  onNavigate: (route: RoutePath) => void;
+}
+
+function EnterNetworkButton({ onNavigate }: EnterNetworkButtonProps) {
+  return (
+    <a
+      className="tlhn-enter-network-button"
+      href="/network"
+      onClick={createRouteClickHandler("/network", onNavigate)}
+    >
+      <span aria-hidden="true" className="tlhn-enter-network-prompt">
+        &gt;_
+      </span>
+      <span>ENTER THE NETWORK</span>
+    </a>
   );
 }
 
