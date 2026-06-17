@@ -13,6 +13,7 @@ import type { AppDatabase } from "./db/client.js";
 import type { DatabaseHealth } from "./db/health.js";
 import { createFactionsRouter } from "./routes/factions.js";
 import { createMessagesRouter } from "./routes/messages.js";
+import { createSubscriptionsRouter } from "./routes/subscriptions.js";
 import type { MessagePostRateLimiter } from "./services/messagePostRateLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +37,8 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.use(express.json({ limit: "1mb" }));
 
   app.use("/api/factions", createFactionsRouter({ db: dependencies.db }));
+
+  app.use("/api/subscriptions", createSubscriptionsRouter({ db: dependencies.db }));
 
   app.use(
     "/api/messages",

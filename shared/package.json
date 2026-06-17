@@ -17,6 +17,10 @@
     "./messages": {
       "types": "./dist/messages.d.ts",
       "default": "./dist/messages.js"
+    },
+    "./subscriptions": {
+      "types": "./dist/subscriptions.d.ts",
+      "default": "./dist/subscriptions.js"
     }
   },
   "scripts": {
