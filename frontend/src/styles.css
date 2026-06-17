@@ -120,6 +120,10 @@
     @apply border-lover-500/35 shadow-neon-lover;
   }
 
+  .tlhn-faction-column[data-active="true"] {
+    @apply bg-tlhn-bone/10;
+  }
+
   .tlhn-network-utility {
     @apply border-tlhn-bone/15;
   }
@@ -163,6 +167,10 @@
 
   .tlhn-faction-column-lover .tlhn-faction-meter::before {
     @apply bg-lover-500 shadow-neon-lover;
+  }
+
+  .tlhn-faction-column[data-active="false"] .tlhn-faction-meter::before {
+    @apply w-1/3 opacity-45;
   }
 
   .tlhn-faction-status {
@@ -333,5 +341,69 @@
 
   .tlhn-enter-network-button span {
     @apply relative;
+  }
+
+  .tlhn-faction-modal-backdrop {
+    @apply fixed inset-0 z-50 flex items-center justify-center bg-tlhn-void/80 px-5 py-8 backdrop-blur-md;
+  }
+
+  .tlhn-faction-modal {
+    @apply relative w-full max-w-3xl rounded-lg border border-hater-500/35 bg-tlhn-panel/95 p-5 text-center shadow-panel-glitch sm:p-7;
+    box-shadow:
+      inset 0 0 0 1px rgba(242, 245, 248, 0.08),
+      0 0 44px rgba(255, 48, 72, 0.2),
+      0 0 62px rgba(47, 143, 255, 0.14);
+  }
+
+  .tlhn-faction-modal::before {
+    @apply pointer-events-none absolute inset-0 rounded-lg content-[''];
+    background:
+      repeating-linear-gradient(
+        180deg,
+        rgba(242, 245, 248, 0.05) 0 1px,
+        transparent 1px 7px
+      ),
+      linear-gradient(90deg, rgba(255, 48, 72, 0.12), rgba(47, 143, 255, 0.1));
+    mix-blend-mode: screen;
+  }
+
+  .tlhn-modal-title {
+    @apply relative z-10 m-0 mt-3 font-terminal text-4xl font-black uppercase text-tlhn-bone text-glow-terminal sm:text-5xl;
+  }
+
+  .tlhn-faction-choice-grid {
+    @apply relative z-10 mt-7 grid gap-4 sm:grid-cols-2;
+  }
+
+  .tlhn-faction-choice {
+    @apply min-h-36 rounded-lg border bg-tlhn-void/70 p-5 text-left font-terminal uppercase text-tlhn-bone transition duration-150 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-tlhn-void disabled:cursor-wait disabled:opacity-65;
+  }
+
+  .tlhn-faction-choice span {
+    @apply block text-3xl font-black;
+  }
+
+  .tlhn-faction-choice small {
+    @apply mt-4 block text-sm text-tlhn-ash;
+  }
+
+  .tlhn-faction-choice-hater {
+    @apply border-hater-500/60 hover:bg-hater-500/10 focus:ring-hater-500;
+  }
+
+  .tlhn-faction-choice-hater span {
+    @apply text-hater-500 text-glow-hater;
+  }
+
+  .tlhn-faction-choice-lover {
+    @apply border-lover-500/60 hover:bg-lover-500/10 focus:ring-lover-500;
+  }
+
+  .tlhn-faction-choice-lover span {
+    @apply text-lover-500 text-glow-lover;
+  }
+
+  .tlhn-modal-error {
+    @apply relative z-10 mt-5 font-terminal text-sm text-hater-300;
   }
 }
