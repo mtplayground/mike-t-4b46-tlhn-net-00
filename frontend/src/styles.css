@@ -145,6 +145,42 @@
     @apply text-4xl sm:text-5xl lg:text-center;
   }
 
+  .tlhn-countdown {
+    @apply relative z-10 mt-7 rounded-lg border border-hater-500/25 bg-tlhn-void/70 p-3 font-terminal shadow-panel-glitch;
+  }
+
+  .tlhn-countdown-label {
+    @apply m-0 text-center text-xs font-bold uppercase text-tlhn-ash;
+  }
+
+  .tlhn-countdown-grid {
+    @apply mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4;
+  }
+
+  .tlhn-countdown-unit {
+    @apply min-w-0 text-center;
+  }
+
+  .tlhn-countdown-value {
+    @apply relative grid min-h-14 place-items-center overflow-hidden rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-2 text-2xl font-black text-hater-100 shadow-neon-hater sm:text-3xl;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tlhn-countdown-value::before {
+    @apply pointer-events-none absolute inset-x-0 top-1/2 h-px bg-tlhn-bone/15 content-[''];
+  }
+
+  .tlhn-countdown-value::after {
+    @apply pointer-events-none absolute inset-0 content-[''];
+    background:
+      linear-gradient(180deg, rgba(242, 245, 248, 0.08), transparent 48%),
+      linear-gradient(0deg, rgba(0, 0, 0, 0.28), transparent 50%);
+  }
+
+  .tlhn-countdown-unit-label {
+    @apply mt-2 block text-[0.65rem] font-bold text-tlhn-ash;
+  }
+
   .tlhn-faction-column-hater .tlhn-faction-title {
     @apply text-hater-500 text-glow-hater;
   }
