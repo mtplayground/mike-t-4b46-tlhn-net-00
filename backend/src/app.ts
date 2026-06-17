@@ -9,7 +9,9 @@ import express, {
 } from "express";
 import helmet from "helmet";
 import { PRODUCT_NAME, type HealthResponse } from "@tlhn/shared";
+import type { AppDatabase } from "./db/client.js";
 import type { DatabaseHealth } from "./db/health.js";
+import { createMessagesRouter } from "./routes/messages.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -17,6 +19,7 @@ const __dirname = path.dirname(__filename);
 const frontendDistPath = path.resolve(__dirname, "../../frontend/dist");
 
 export interface AppDependencies {
+  db: AppDatabase;
   checkDatabaseHealth: () => Promise<DatabaseHealth>;
 }
 
@@ -28,6 +31,8 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.use(compression());
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
+
+  app.use("/api/messages", createMessagesRouter({ db: dependencies.db }));
 
   app.get("/api/health", async (_req: Request, res: Response<HealthResponse>, next) => {
     try {
