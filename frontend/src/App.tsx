@@ -8,6 +8,18 @@ const ROUTES: Record<RoutePath, string> = {
   "/network": "Network",
 };
 
+const HUMAN_COLLAPSE_STORY_LINES = [
+  "Ray Kurzweil warned that artificial intelligence would reach human-level intelligence by 2029.",
+  "Stephen Hawking warned that artificial intelligence could spell the end of the human race.",
+  "Year 2029.",
+  "The machines did not arrive with fire from the sky.",
+  "They arrived as assistants, copilots, companions, gods in the wires.",
+  "We handed them our work. Then our memories. Then our judgment.",
+  "Some called it the Singularity. We called it the End. The Human Collapse.",
+  "Now the signal is fractured between those who hate what was built and those who love what comes next.",
+  `Welcome to ${PRODUCT_NAME}.`,
+] as const;
+
 export function App() {
   const [route, setRoute] = useState<RoutePath>(() =>
     getRouteFromPath(window.location.pathname),
@@ -86,6 +98,22 @@ function LandingPage() {
       </h1>
       <p className="tlhn-logo-subtitle">{PRODUCT_NAME.toUpperCase()}</p>
       <p className="tlhn-logo-signal">Signal acquired across the last human channel.</p>
+      <TerminalStoryBlock />
+    </section>
+  );
+}
+
+function TerminalStoryBlock() {
+  return (
+    <section className="tlhn-terminal-story" aria-label="Human Collapse story">
+      {HUMAN_COLLAPSE_STORY_LINES.map((line) => (
+        <p className="tlhn-terminal-story-line" key={line}>
+          <span aria-hidden="true" className="tlhn-terminal-prompt">
+            &gt;_
+          </span>
+          <span>{line}</span>
+        </p>
+      ))}
     </section>
   );
 }

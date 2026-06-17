@@ -92,7 +92,7 @@
 
   .tlhn-logo-stage {
     @apply relative z-10 mx-auto flex w-full max-w-6xl flex-col items-center justify-center text-center;
-    min-height: min(680px, calc(100vh - 10rem));
+    min-height: min(860px, calc(100vh - 10rem));
   }
 
   .tlhn-logo-stage::before,
@@ -183,5 +183,38 @@
 
   .tlhn-logo-signal {
     @apply relative mt-5 max-w-2xl font-terminal text-sm uppercase text-tlhn-ash sm:text-base;
+  }
+
+  .tlhn-terminal-story {
+    @apply relative mt-10 w-full max-w-4xl rounded-lg border border-hater-500/30 bg-tlhn-void/80 p-4 text-left font-terminal text-sm text-tlhn-bone/80 shadow-panel-glitch backdrop-blur-sm sm:p-5 sm:text-base;
+    box-shadow:
+      inset 0 0 0 1px rgba(242, 245, 248, 0.06),
+      inset 0 0 42px rgba(255, 48, 72, 0.08),
+      0 0 32px rgba(255, 48, 72, 0.12);
+  }
+
+  .tlhn-terminal-story::before {
+    @apply pointer-events-none absolute inset-0 rounded-lg content-[''];
+    background:
+      repeating-linear-gradient(
+        180deg,
+        rgba(242, 245, 248, 0.045) 0 1px,
+        transparent 1px 6px
+      ),
+      linear-gradient(90deg, rgba(255, 48, 72, 0.1), transparent 34%);
+    mix-blend-mode: screen;
+  }
+
+  .tlhn-terminal-story-line {
+    @apply relative z-10 m-0 grid gap-3 leading-6;
+    grid-template-columns: 2.25rem minmax(0, 1fr);
+  }
+
+  .tlhn-terminal-story-line + .tlhn-terminal-story-line {
+    @apply mt-3;
+  }
+
+  .tlhn-terminal-prompt {
+    @apply text-hater-500 text-glow-hater;
   }
 }
