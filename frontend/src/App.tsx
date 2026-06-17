@@ -1,4 +1,10 @@
-import { useEffect, useState, type MouseEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useState,
+  type FormEvent,
+  type MouseEvent,
+  type ReactNode,
+} from "react";
 import {
   FACTIONS,
   FACTION_DISPLAY_NAMES,
@@ -7,7 +13,11 @@ import {
   type Faction,
 } from "@tlhn/shared";
 import type { FactionJoinResponse } from "@tlhn/shared/factions";
-import type { ListMessagesResponse, MessageResponse } from "@tlhn/shared/messages";
+import type {
+  CreateMessageResponse,
+  ListMessagesResponse,
+  MessageResponse,
+} from "@tlhn/shared/messages";
 import { clientConfig } from "./config";
 
 type RoutePath = "/" | "/network";
@@ -163,6 +173,7 @@ function NetworkPage() {
   const [identity, setIdentity] = useState<NetworkIdentity | null>(() =>
     readStoredNetworkIdentity(),
   );
+  const [messageRefreshToken, setMessageRefreshToken] = useState(0);
   const [joinState, setJoinState] = useState<{
     errorMessage?: string;
     status: "idle" | "joining" | "error";
@@ -194,14 +205,21 @@ function NetworkPage() {
     }
   };
 
+  const refreshMessages = () => {
+    setMessageRefreshToken((currentToken) => currentToken + 1);
+  };
+
   return (
     <>
       <section className="tlhn-network-layout" aria-labelledby="network-title">
         <FactionColumn
           accent="hater"
           faction="ai_haters"
+          identity={identity?.faction === "ai_haters" ? identity : null}
           isActive={identity?.faction === "ai_haters"}
           kicker="Red channel"
+          onMessageCreated={refreshMessages}
+          refreshToken={messageRefreshToken}
           statusLines={[
             "Resistance node",
             "Signal hostility high",
@@ -228,8 +246,11 @@ function NetworkPage() {
         <FactionColumn
           accent="lover"
           faction="ai_lovers"
+          identity={identity?.faction === "ai_lovers" ? identity : null}
           isActive={identity?.faction === "ai_lovers"}
           kicker="Blue channel"
+          onMessageCreated={refreshMessages}
+          refreshToken={messageRefreshToken}
           statusLines={[
             "Ascension node",
             "Signal affinity high",
@@ -247,9 +268,10 @@ function NetworkPage() {
 interface ChatPanelProps {
   accent: "hater" | "lover";
   faction: Faction;
+  refreshToken: number;
 }
 
-function ChatPanel({ accent, faction }: ChatPanelProps) {
+function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [errorMessage, setErrorMessage] = useState<string>();
@@ -296,7 +318,7 @@ function ChatPanel({ accent, faction }: ChatPanelProps) {
       abortController.abort();
       window.clearInterval(intervalId);
     };
-  }, [faction]);
+  }, [faction, refreshToken]);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setNow(Date.now()), 60_000);
@@ -333,6 +355,122 @@ function ChatPanel({ accent, faction }: ChatPanelProps) {
         </ol>
       )}
     </section>
+  );
+}
+
+interface MessageComposerProps {
+  accent: "hater" | "lover";
+  identity: NetworkIdentity;
+  onMessageCreated: () => void;
+}
+
+function MessageComposer({ accent, identity, onMessageCreated }: MessageComposerProps) {
+  const [body, setBody] = useState("");
+  const [submitState, setSubmitState] = useState<{
+    errorMessage?: string;
+    status: "idle" | "submitting" | "error";
+  }>({ status: "idle" });
+  const isSubmitting = submitState.status === "submitting";
+
+  const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    const trimmedBody = body.trim();
+    if (!trimmedBody) {
+      setSubmitState({
+        errorMessage: "Message body required",
+        status: "error",
+      });
+      return;
+    }
+
+    setSubmitState({ status: "submitting" });
+
+    try {
+      const response = await fetch("/api/messages", {
+        body: JSON.stringify({
+          body: trimmedBody,
+          display_name: identity.displayName,
+          faction: identity.faction,
+        }),
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "POST",
+      });
+
+      const data = (await response.json().catch(() => null)) as
+        | CreateMessageResponse
+        | { error?: string; retry_after_seconds?: number }
+        | null;
+
+      if (!response.ok) {
+        const retryAfterSeconds =
+          data && "retry_after_seconds" in data ? data.retry_after_seconds : undefined;
+        const cooldownSuffix =
+          typeof retryAfterSeconds === "number"
+            ? ` Retry in ${retryAfterSeconds}s.`
+            : "";
+        const message =
+          data && "error" in data && typeof data.error === "string"
+            ? data.error
+            : `Message post failed with status ${response.status}`;
+
+        throw new Error(`${message}.${cooldownSuffix}`);
+      }
+
+      if (!data || !("message" in data)) {
+        throw new Error("Message post response was invalid");
+      }
+
+      setBody("");
+      setSubmitState({ status: "idle" });
+      onMessageCreated();
+    } catch (error) {
+      setSubmitState({
+        errorMessage: error instanceof Error ? error.message : "Message post failed",
+        status: "error",
+      });
+    }
+  };
+
+  return (
+    <form
+      className={`tlhn-message-composer tlhn-message-composer-${accent}`}
+      onSubmit={submitMessage}
+    >
+      <label
+        className="tlhn-message-composer-label"
+        htmlFor={`${identity.faction}-message`}
+      >
+        {identity.displayName}
+      </label>
+      <div className="tlhn-message-composer-row">
+        <input
+          className="tlhn-message-input"
+          disabled={isSubmitting}
+          id={`${identity.faction}-message`}
+          maxLength={1000}
+          onChange={(event) => setBody(event.target.value)}
+          placeholder="Type your message…"
+          type="text"
+          value={body}
+        />
+        <button
+          className="tlhn-message-post-button"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          {isSubmitting ? "POSTING" : "POST"}
+        </button>
+      </div>
+      {submitState.status === "error" && (
+        <p className="tlhn-message-composer-error" role="alert">
+          {submitState.errorMessage}
+        </p>
+      )}
+    </form>
   );
 }
 
@@ -465,16 +603,22 @@ function isFaction(value: unknown): value is Faction {
 interface FactionColumnProps {
   accent: "hater" | "lover";
   faction: Faction;
+  identity: NetworkIdentity | null;
   isActive: boolean;
   kicker: string;
+  onMessageCreated: () => void;
+  refreshToken: number;
   statusLines: readonly string[];
 }
 
 function FactionColumn({
   accent,
   faction,
+  identity,
   isActive,
   kicker,
+  onMessageCreated,
+  refreshToken,
   statusLines,
 }: FactionColumnProps) {
   return (
@@ -493,7 +637,14 @@ function FactionColumn({
           <li key={line}>{line}</li>
         ))}
       </ul>
-      <ChatPanel accent={accent} faction={faction} />
+      <ChatPanel accent={accent} faction={faction} refreshToken={refreshToken} />
+      {identity && (
+        <MessageComposer
+          accent={accent}
+          identity={identity}
+          onMessageCreated={onMessageCreated}
+        />
+      )}
     </section>
   );
 }
