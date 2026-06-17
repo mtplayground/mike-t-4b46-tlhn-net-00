@@ -12,6 +12,7 @@ import { PRODUCT_NAME, type HealthResponse } from "@tlhn/shared";
 import type { AppDatabase } from "./db/client.js";
 import type { DatabaseHealth } from "./db/health.js";
 import { createMessagesRouter } from "./routes/messages.js";
+import type { MessagePostRateLimiter } from "./services/messagePostRateLimit.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -21,6 +22,7 @@ const frontendDistPath = path.resolve(__dirname, "../../frontend/dist");
 export interface AppDependencies {
   db: AppDatabase;
   checkDatabaseHealth: () => Promise<DatabaseHealth>;
+  messagePostRateLimiter: MessagePostRateLimiter;
 }
 
 export function createApp(dependencies: AppDependencies): express.Express {
@@ -32,7 +34,13 @@ export function createApp(dependencies: AppDependencies): express.Express {
   app.use(cors({ origin: true, credentials: true }));
   app.use(express.json({ limit: "1mb" }));
 
-  app.use("/api/messages", createMessagesRouter({ db: dependencies.db }));
+  app.use(
+    "/api/messages",
+    createMessagesRouter({
+      db: dependencies.db,
+      rateLimiter: dependencies.messagePostRateLimiter,
+    }),
+  );
 
   app.get("/api/health", async (_req: Request, res: Response<HealthResponse>, next) => {
     try {

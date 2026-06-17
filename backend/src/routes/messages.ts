@@ -7,11 +7,17 @@ import {
 } from "@tlhn/shared/messages";
 import type { AppDatabase } from "../db/client.js";
 import { messages, type Message } from "../db/schema.js";
+import {
+  getMessagePostRateLimitKey,
+  type MessagePostRateLimitDenied,
+  type MessagePostRateLimiter,
+} from "../services/messagePostRateLimit.js";
 
 const RECENT_MESSAGE_LIMIT = 50;
 
 export interface MessagesRouterDependencies {
   db: AppDatabase;
+  rateLimiter: MessagePostRateLimiter;
 }
 
 export function createMessagesRouter(dependencies: MessagesRouterDependencies): Router {
@@ -61,6 +67,14 @@ export function createMessagesRouter(dependencies: MessagesRouterDependencies): 
       return;
     }
 
+    const rateLimitKey = getMessagePostRateLimitKey(req);
+    const rateLimit = dependencies.rateLimiter.reserve(rateLimitKey);
+
+    if (!rateLimit.allowed) {
+      sendRateLimitResponse(res, rateLimit);
+      return;
+    }
+
     try {
       const [created] = await dependencies.db
         .insert(messages)
@@ -80,6 +94,7 @@ export function createMessagesRouter(dependencies: MessagesRouterDependencies): 
         message: toMessageResponse(created),
       });
     } catch (error) {
+      dependencies.rateLimiter.release(rateLimit.key, rateLimit.nextAllowedAt);
       next(error);
     }
   });
@@ -96,4 +111,18 @@ function toMessageResponse(message: Message): MessageResponse {
     user: message.user,
     created_at: message.createdAt.toISOString(),
   };
+}
+
+function sendRateLimitResponse(
+  res: Response,
+  rateLimit: MessagePostRateLimitDenied,
+): void {
+  res.setHeader("Retry-After", String(rateLimit.retryAfterSeconds));
+  res.status(429).json({
+    error: "Message post cooldown active",
+    cooldown_ms: rateLimit.cooldownMs,
+    retry_after_ms: rateLimit.retryAfterMs,
+    retry_after_seconds: rateLimit.retryAfterSeconds,
+    next_allowed_at: new Date(rateLimit.nextAllowedAt).toISOString(),
+  });
 }

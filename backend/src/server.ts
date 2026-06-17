@@ -3,12 +3,14 @@ import { createApp } from "./app.js";
 import { getServerConfig } from "./config.js";
 import { createDatabaseClient } from "./db/client.js";
 import { checkDatabaseHealth } from "./db/health.js";
+import { MessagePostRateLimiter } from "./services/messagePostRateLimit.js";
 
 const config = getServerConfig();
 const database = createDatabaseClient(config);
 const app = createApp({
   db: database.db,
   checkDatabaseHealth: () => checkDatabaseHealth(database.pool),
+  messagePostRateLimiter: new MessagePostRateLimiter(),
 });
 
 const server = app.listen(config.port, config.host, () => {

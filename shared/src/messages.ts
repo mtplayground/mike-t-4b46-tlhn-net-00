@@ -20,6 +20,8 @@ export const createMessageRequestSchema = z
 export type ListMessagesQuery = z.infer<typeof listMessagesQuerySchema>;
 export type CreateMessageRequest = z.infer<typeof createMessageRequestSchema>;
 
+export const MESSAGE_POST_COOLDOWN_MS = 30_000;
+
 export interface MessageResponse {
   id: number;
   faction: Faction;
@@ -35,4 +37,12 @@ export interface ListMessagesResponse {
 
 export interface CreateMessageResponse {
   message: MessageResponse;
+}
+
+export interface MessagePostRateLimitResponse {
+  error: "Message post cooldown active";
+  cooldown_ms: number;
+  retry_after_ms: number;
+  retry_after_seconds: number;
+  next_allowed_at: string;
 }
