@@ -1,18 +1,23 @@
-Architecture plan for Issues #95-#96
+Architecture plan for Issues #99 and #100
 
 Project shape
-- Monorepo with a Vite React/Tailwind frontend in `frontend/`, Rust Axum/PostgreSQL backend in `backend/`, and shared TypeScript DTO/constants in `shared/`.
-- Both requested issues are frontend-only visual/layout changes. No backend API, database schema, runtime config, or shared DTO changes are expected.
-- Primary implementation files for later sessions are `frontend/src/App.tsx` for component removal/JSX structure and `frontend/src/styles.css` for spacing, decorative pseudo-elements, and compact tally sizing.
+- Monorepo with a Vite React frontend (`frontend/`), Rust Axum backend (`backend/`), and shared TypeScript DTO/constants package (`shared/`).
+- These issues are frontend layout-only changes centered in `frontend/src/App.tsx` and `frontend/src/styles.css`; no backend API, database schema, or shared DTO changes are expected.
+- Existing product branding and copy remain from PRODUCT.md: The Last Human Network / TLHN.
 
-Issue dependencies and implementation order
-1. #95 remove the network-page top header block first. Delete `NetworkTopHeader` and its props if no longer referenced, remove its render from `NetworkPage`, and tighten any layout spacing that depended on the header.
-2. #96 then adjust remaining network-page styling: remove the subscription row triangle/zig-zag `::before`/`::after` decorations, reduce subscription side padding, and shrink faction tally card min-height/label/numeral sizing.
-- #96 should be implemented after #95 so final vertical rhythm is judged against the headerless layout.
+Relevant frontend structure
+- `NetworkPage` in `frontend/src/App.tsx` owns the page section order: subscription, countdown, live tallies, feed, composer, footer utility row, and `SiteFooter`.
+- `FactionTallyDisplay` renders the AI Haters / AI Lovers tally cards; it depends on counts loaded from `/api/factions/counts`.
+- The Identity / Faction / Transmission values are rendered by `UtilityLine` instances inside `.tlhn-utility-stack` in the footer row.
+- Layout and responsive behavior are primarily CSS/Tailwind component classes in `frontend/src/styles.css`.
+
+Issue dependencies and sequencing
+- Issue #99 should move the existing `tlhn-network-tallies` section in `NetworkPage` to immediately before `<SiteFooter />`, after the utility/status footer row. It should not change the polling/data-fetching logic or `FactionTallyDisplay` API.
+- Issue #100 should modify `.tlhn-utility-stack` styling so the three utility lines render as a single responsive row: three columns on medium and larger screens, stacked on small screens.
+- The two issues are independent, but #99 touches the JSX order around the footer row and site footer, while #100 touches CSS for content inside that row. Implementing either first should be safe if the JSX class names are preserved.
 
 Key design decisions
-- Preserve the existing product brand from PRODUCT.md: The Last Human Network / TLHN. Do not introduce placeholder or agent branding.
-- Keep existing API polling, faction identity, message composer, subscription behavior, cookies/localStorage behavior, and SPA routing unchanged.
-- Prefer deleting now-unused React code and CSS selectors rather than leaving dead components/styles.
-- Keep visual changes within the established TLHN dark/glitch system: hater red, lover blue, terminal typography, neon panels.
-- Validate each later issue with at least `npm run build`, `npm run lint`, and `npm run format:check`; browser/resource checks are appropriate because these are UI layout changes.
+- Keep changes minimal and layout-focused; do not introduce new state, routes, APIs, dependencies, or persistence.
+- Preserve accessibility labels/headings and existing section IDs (`network-about`, `network-join`) so anchor links and tests remain stable.
+- Reuse existing CSS class names where possible to avoid broad style regressions.
+- Validate with `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when implementing the individual issues.

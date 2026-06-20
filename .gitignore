@@ -1,11 +1,8 @@
 target/
 node_modules/
-dist/
 .gh_token
 .claude/
 .database_url
-.db_decision
-.storage_decision
 .task_id
 .container_name
 .app_name
@@ -15,10 +12,7 @@ dist/
 .gitkeep
 .progress
 .env
-.env.*
-!.env.example
-
-# deployment verification artifacts
-.deploy_url
-ui-verify.cjs
-verify-screenshot.png
+.env.local
+.env.production
+frontend/dist/
+shared/dist/
