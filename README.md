@@ -1,23 +1,23 @@
 # The Last Human Network
 
-The Last Human Network is a TypeScript monorepo with a Vite React frontend, an
-Express backend, shared DTO contracts, and PostgreSQL-backed persistent state.
-The app ships as one self-hosted build: Express serves the compiled frontend and
-the `/api/*` routes from `0.0.0.0:8080` by default.
+The Last Human Network is a monorepo with a Vite React frontend, a Rust Axum
+backend, shared TypeScript DTO contracts, and PostgreSQL-backed persistent
+state. The app ships as one self-hosted build: the Rust backend serves the
+compiled frontend and `/api/*` routes from `0.0.0.0:8080` by default.
 
 ## Structure
 
 - `frontend/` - Vite + React client
-- `backend/` - Express API server
+- `backend/` - Rust Axum API server and PostgreSQL migrations
 - `shared/` - shared TypeScript constants and DTOs
 
 The frontend uses Tailwind theme tokens for the TLHN dark/glitch visual system:
 Hater red, Lover blue, neon glow utilities, scanlines, grunge noise, terminal
-typography, faction chat panels, countdown, and subscription controls.
+typography, unified faction feed, countdown, tallies, and subscription controls.
 
 ## Local Development
 
-Install dependencies:
+Install JavaScript dependencies:
 
 ```bash
 npm install
@@ -29,13 +29,13 @@ Create a local environment file:
 cp .env.example .env
 ```
 
-Run all dev servers:
+Run the shared TypeScript watcher, Rust API server, and Vite frontend:
 
 ```bash
 npm run dev
 ```
 
-The Vite dev server proxies `/api` to the Express server on port `8080`.
+The Vite dev server proxies `/api` to the Rust server on port `8080`.
 
 ## Validation
 
@@ -48,9 +48,10 @@ npm run format:check
 npm test
 ```
 
-`npm test` runs type checks plus backend integration and end-to-end API flow
-tests for faction join, message posting, cooldown handling, polling reads,
-tallies, and subscription dedupe.
+`npm test` runs TypeScript type checks plus the Rust test suite. Rust integration
+tests start a local PostgreSQL 16 instance, apply the checked-in SQL migrations,
+and cover health, faction join idempotency, message validation, pagination,
+cooldown handling, subscription dedupe, SPA fallback, and an end-to-end API flow.
 
 ## Production Build
 
@@ -66,7 +67,7 @@ Run database migrations:
 DATABASE_URL=postgres://... npm run db:migrate
 ```
 
-Start the built Express server:
+Start the built Rust server:
 
 ```bash
 HOST=0.0.0.0 PORT=8080 npm start
@@ -96,8 +97,8 @@ settings when needed.
 
 - Persistent state must stay in PostgreSQL. The app does not use SQLite,
   JSON-file persistence, in-memory production storage, or Fly volumes.
-- Static assets are served from `frontend/dist` by the Express backend after
+- Static assets are served from `frontend/dist` by the Rust backend after
   `npm run build`.
 - Health checks are available at `/api/health` and include database status.
-- API errors return JSON; unexpected request errors are logged by the Express
-  error handler before returning a generic `500`.
+- API errors return JSON; database failures are logged by the Rust route handlers
+  before returning generic server errors.
