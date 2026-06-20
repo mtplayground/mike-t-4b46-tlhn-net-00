@@ -13,8 +13,8 @@ PostgreSQL-backed state in a monorepo.
 - Site favicon served from `/favicon.svg`: a dark rounded TLHN tile with a red
   neon mark that matches the product brand.
 - `/network` SPA route with a single-column full-width layout ordered as:
-  full-width subscription row, large countdown band, unified feed, composer,
-  Identity/Faction/Transmission utility line, live tally cards, and site footer.
+  compact large countdown band, live tally cards, unified feed, composer,
+  Identity/Faction/Transmission utility line, subscription row, and site footer.
   The network page no longer includes a separate TLHN header/action box above
   the content.
 - Required faction-selection modal on first network entry. Joining assigns a
@@ -31,19 +31,21 @@ PostgreSQL-backed state in a monorepo.
   timestamps as minutes, hours/minutes, or days/hours.
 - Message composer posts as the selected faction/name, enforces a 30-second
   cooldown in the UI, and handles backend 429 responses with retry metadata.
-- Compact live faction tally cards poll `/api/factions/counts`, sit just above
-  the site footer, and render AI Haters in red with `HUMANS FIGHTING BACK`, AI
-  Lovers in blue with `EMBRACING THE FUTURE`, and neon numerals.
+- Compact live faction tally cards poll `/api/factions/counts`, sit immediately
+  below the countdown, and render AI Haters in red with `HUMANS FIGHTING BACK`,
+  AI Lovers in blue with `EMBRACING THE FUTURE`, and neon numerals.
 - The Identity / Faction / Transmission utility line appears as three columns on
-  medium and larger screens, stacking vertically on small screens.
+  medium and larger screens, stacks vertically on small screens, and uses tight
+  top spacing to stay visually connected to the surrounding network sections.
 - Large flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
-  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment.
-- Full-width neon `KEEP YOUR HUMANITY UPDATES` subscription row sits above the
-  countdown without side triangle/zig-zag accents, posts to
+  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. The
+  countdown boxes are shorter while preserving the large numeral size.
+- Full-width neon `KEEP YOUR HUMANITY UPDATES` subscription row sits near the
+  bottom just above the footer without side triangle/zig-zag accents, posts to
   `/api/subscriptions`, validates client-side, and shows success, duplicate, and
   error states.
 - Bottom footer shows `© 2025 TLHN. All rights reserved.`, Manifesto/Privacy/
-  Terms/Contact links, and X/Discord icons.
+  Terms/Contact links, an X link, and a Discord logo link.
 
 ## Architecture
 
