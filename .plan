@@ -1,18 +1,18 @@
-Architecture plan for Issues #89-#91
+Architecture plan for Issues #95-#96
 
 Project shape
 - Monorepo with a Vite React/Tailwind frontend in `frontend/`, Rust Axum/PostgreSQL backend in `backend/`, and shared TypeScript DTO/constants in `shared/`.
-- The requested work is frontend-only. No shared DTO, database schema, or backend API changes are expected.
-- Primary implementation files are `frontend/src/App.tsx` for component structure/content and `frontend/src/styles.css` for TLHN visual treatment, spacing, logos, countdown sizing, and feed/composer presentation.
+- Both requested issues are frontend-only visual/layout changes. No backend API, database schema, runtime config, or shared DTO changes are expected.
+- Primary implementation files for later sessions are `frontend/src/App.tsx` for component removal/JSX structure and `frontend/src/styles.css` for spacing, decorative pseudo-elements, and compact tally sizing.
 
 Issue dependencies and implementation order
-1. #89 remove network-page status/story fragments first so later spacing work is based on the final layout.
-2. #90 refine feed/composer UI next: remove feed headings, replace faction avatar visuals with stronger hater/lover logo motifs, ensure faction-colored display names, and move timestamps below messages.
-3. #91 adjust page layout last: move subscription above the countdown, update subscription copy, and increase countdown tile height to visually match tally cards.
+1. #95 remove the network-page top header block first. Delete `NetworkTopHeader` and its props if no longer referenced, remove its render from `NetworkPage`, and tighten any layout spacing that depended on the header.
+2. #96 then adjust remaining network-page styling: remove the subscription row triangle/zig-zag `::before`/`::after` decorations, reduce subscription side padding, and shrink faction tally card min-height/label/numeral sizing.
+- #96 should be implemented after #95 so final vertical rhythm is judged against the headerless layout.
 
 Key design decisions
-- Preserve the existing product brand and copy from PRODUCT.md: The Last Human Network / TLHN.
-- Keep all faction constants and display labels sourced from `@tlhn/shared`; changes should be presentational only.
-- Prefer existing React component boundaries in `App.tsx` over introducing new modules for this small batch; extract small presentational helpers only if it reduces duplication.
-- Preserve current API polling, composer cooldown, subscription form behavior, cookies/localStorage identity behavior, and SPA routing.
-- Validate with the existing commands: `npm run build`, `npm run lint`, `npm run format:check`, and targeted browser/resource checks when UI layout changes are complete.
+- Preserve the existing product brand from PRODUCT.md: The Last Human Network / TLHN. Do not introduce placeholder or agent branding.
+- Keep existing API polling, faction identity, message composer, subscription behavior, cookies/localStorage behavior, and SPA routing unchanged.
+- Prefer deleting now-unused React code and CSS selectors rather than leaving dead components/styles.
+- Keep visual changes within the established TLHN dark/glitch system: hater red, lover blue, terminal typography, neon panels.
+- Validate each later issue with at least `npm run build`, `npm run lint`, and `npm run format:check`; browser/resource checks are appropriate because these are UI layout changes.
