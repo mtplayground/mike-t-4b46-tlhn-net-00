@@ -7,18 +7,21 @@ PostgreSQL-backed state in a monorepo.
 
 ## Current Product
 
-- App shell header includes a larger responsive upper-left `TLHN` wordmark
-  using the terminal font, red Hater color, and glow treatment.
+- App shell header includes a responsive upper-left `TLHN` wordmark using the
+  terminal font, red Hater color, and glow treatment. Mobile shell/header/nav
+  spacing is tightened and desktop spacing returns at `sm:` breakpoints.
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
-  `>_ ENTER THE NETWORK` navigation.
+  `>_ ENTER THE NETWORK` navigation. On phones, the logo, story spacing, and
+  story typography scale down so the hero fits without excess vertical chrome.
 - Site favicon served from `/favicon.svg`: a dark rounded TLHN tile with a red
   neon mark that matches the product brand.
-- `/network` SPA route with a single-column full-width layout ordered as:
-  compact large countdown band, live tally cards, unified feed, composer,
-  Identity/Faction/Transmission utility line, subscription row, and site footer.
-  The network page no longer includes a separate TLHN header/action box above
-  the content.
+- `/network` SPA route with a single-column full-width layout. Desktop/tablet
+  order is compact large countdown band, live tally cards, unified feed,
+  composer, Identity/Faction/Transmission utility line, subscription row, and
+  site footer. On phones, the unified feed is raised above live tallies so users
+  reach messages sooner. The network page no longer includes a separate TLHN
+  header/action box above the content.
 - Required faction-selection modal on first network entry. Joining assigns a
   generated `prefix_xxxxx` display name, increments faction tallies, sets
   HttpOnly faction/name cookies through the API, and stores the identity in
@@ -36,15 +39,17 @@ PostgreSQL-backed state in a monorepo.
   server separately applies a transient frequency limiter of at most two
   messages per client per second; its `429` response shows a brief "slow down"
   notice without starting the 30-second cooldown.
-- Compact live faction tally cards poll `/api/factions/counts`, sit immediately
-  below the countdown, and render AI Haters in red with `HUMANS FIGHTING BACK`,
-  AI Lovers in blue with `EMBRACING THE FUTURE`, and neon numerals.
+- Compact live faction tally cards poll `/api/factions/counts`; they render AI
+  Haters in red with `HUMANS FIGHTING BACK`, AI Lovers in blue with `EMBRACING
+  THE FUTURE`, and neon numerals. Phone layouts reduce tally padding,
+  min-height, label size, and count size while restoring larger cards at `sm:`+.
 - The Identity / Faction / Transmission utility line appears as three columns on
   medium and larger screens, stacks vertically on small screens, and uses tight
   top spacing to stay visually connected to the surrounding network sections.
-- Large flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
-  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. The
-  countdown boxes are shorter while preserving the large numeral size.
+- Flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
+  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. Phone
+  layouts use shorter boxes and smaller labels/numerals; larger countdown
+  treatment returns at `sm:`+.
 - Full-width neon `KEEP YOUR HUMANITY UPDATES` subscription row sits near the
   bottom just above the footer without side triangle/zig-zag accents, posts to
   `/api/subscriptions`, validates client-side, and shows success, duplicate, and
