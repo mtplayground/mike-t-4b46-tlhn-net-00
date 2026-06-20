@@ -276,29 +276,103 @@ function NetworkPage() {
   return (
     <>
       <section className="tlhn-network-layout" aria-labelledby="network-title">
+        <NetworkTopHeader identity={identity} />
         <CountdownTimer />
-        <FactionColumn
-          accent="hater"
-          count={factionCounts.ai_haters}
-          faction="ai_haters"
-          identity={identity?.faction === "ai_haters" ? identity : null}
-          isActive={identity?.faction === "ai_haters"}
-          kicker="Red channel"
-          onMessageCreated={refreshMessages}
-          refreshToken={messageRefreshToken}
-          statusLines={[
-            "Resistance node",
-            "Signal hostility high",
-            "Human-first relay",
-          ]}
-        />
-        <section className="tlhn-network-utility" aria-labelledby="network-title">
-          <p className="tlhn-network-kicker">Utility core</p>
-          <h1 id="network-title" className="tlhn-network-title">
-            Network
-          </h1>
-          <NetworkStatusNotice countsState={countsState} />
+        <section
+          className="tlhn-network-section tlhn-network-tallies"
+          aria-labelledby="network-tallies-title"
+        >
+          <div className="tlhn-network-section-heading">
+            <p className="tlhn-network-kicker">Live faction tallies</p>
+            <h2 id="network-tallies-title" className="tlhn-network-section-title">
+              The split signal
+            </h2>
+          </div>
+          <div className="tlhn-network-tally-grid">
+            <FactionTallyDisplay
+              accent="hater"
+              count={factionCounts.ai_haters}
+              faction="ai_haters"
+            />
+            <FactionTallyDisplay
+              accent="lover"
+              count={factionCounts.ai_lovers}
+              faction="ai_lovers"
+            />
+          </div>
+        </section>
+        <section
+          className="tlhn-network-section tlhn-network-feed-section"
+          id="network-join"
+          aria-labelledby="network-feed-title"
+        >
+          <div className="tlhn-network-section-heading">
+            <p className="tlhn-network-kicker">Open transmissions</p>
+            <h2 id="network-feed-title" className="tlhn-network-section-title">
+              Faction feeds
+            </h2>
+          </div>
+          <div className="tlhn-network-feed-grid">
+            <FactionFeedPanel
+              accent="hater"
+              faction="ai_haters"
+              isActive={identity?.faction === "ai_haters"}
+              kicker="Red channel"
+              refreshToken={messageRefreshToken}
+              statusLines={[
+                "Resistance node",
+                "Signal hostility high",
+                "Human-first relay",
+              ]}
+            />
+            <FactionFeedPanel
+              accent="lover"
+              faction="ai_lovers"
+              isActive={identity?.faction === "ai_lovers"}
+              kicker="Blue channel"
+              refreshToken={messageRefreshToken}
+              statusLines={[
+                "Ascension node",
+                "Signal affinity high",
+                "Machine-allied relay",
+              ]}
+            />
+          </div>
+        </section>
+        <section
+          className="tlhn-network-section tlhn-network-composer-section"
+          aria-labelledby="network-composer-title"
+        >
+          <div className="tlhn-network-section-heading">
+            <p className="tlhn-network-kicker">Signal composer</p>
+            <h2 id="network-composer-title" className="tlhn-network-section-title">
+              Broadcast to the network
+            </h2>
+          </div>
+          {identity ? (
+            <MessageComposer
+              accent={identity.faction === "ai_haters" ? "hater" : "lover"}
+              identity={identity}
+              onMessageCreated={refreshMessages}
+            />
+          ) : (
+            <p className="tlhn-network-empty-composer" role="status">
+              &gt;_ Choose a faction to unlock the transmission channel.
+            </p>
+          )}
+        </section>
+        <section
+          className="tlhn-network-section tlhn-network-subscription-section"
+          aria-label="Network subscription"
+        >
           <EmailSubscriptionForm />
+        </section>
+        <section
+          className="tlhn-network-footer-row"
+          id="network-about"
+          aria-label="Network status and identity"
+        >
+          <NetworkStatusNotice countsState={countsState} />
           <div className="tlhn-utility-stack" aria-label="Network utilities">
             <UtilityLine
               label="Identity"
@@ -314,21 +388,6 @@ function NetworkPage() {
             />
           </div>
         </section>
-        <FactionColumn
-          accent="lover"
-          count={factionCounts.ai_lovers}
-          faction="ai_lovers"
-          identity={identity?.faction === "ai_lovers" ? identity : null}
-          isActive={identity?.faction === "ai_lovers"}
-          kicker="Blue channel"
-          onMessageCreated={refreshMessages}
-          refreshToken={messageRefreshToken}
-          statusLines={[
-            "Ascension node",
-            "Signal affinity high",
-            "Machine-allied relay",
-          ]}
-        />
       </section>
       {!identity && (
         <FactionSelectionModal joinState={joinState} onJoinFaction={joinFaction} />
@@ -1148,54 +1207,79 @@ function isFaction(value: unknown): value is Faction {
   return typeof value === "string" && FACTIONS.includes(value as Faction);
 }
 
-interface FactionColumnProps {
-  accent: "hater" | "lover";
-  count: number;
-  faction: Faction;
+interface NetworkTopHeaderProps {
   identity: NetworkIdentity | null;
+}
+
+function NetworkTopHeader({ identity }: NetworkTopHeaderProps) {
+  return (
+    <header className="tlhn-network-top-header">
+      <div>
+        <p className="tlhn-network-kicker">Human signal active</p>
+        <h1 id="network-title" className="tlhn-network-title">
+          {PRODUCT_SHORT_NAME}
+        </h1>
+        <p className="tlhn-network-header-copy">
+          {PRODUCT_NAME} is the last channel between humans resisting the machines and
+          those embracing what comes next.
+        </p>
+      </div>
+      <nav className="tlhn-network-actions" aria-label="Network actions">
+        <a className="tlhn-network-action" href="#network-about">
+          ABOUT TLHN
+        </a>
+        <a
+          className="tlhn-network-action tlhn-network-action-primary"
+          href="#network-join"
+        >
+          JOIN THE NETWORK
+        </a>
+      </nav>
+      <p className="tlhn-network-header-status" role="status">
+        &gt;_ {identity ? `${identity.displayName} connected` : "Identity unassigned"}
+      </p>
+    </header>
+  );
+}
+
+interface FactionFeedPanelProps {
+  accent: "hater" | "lover";
+  faction: Faction;
   isActive: boolean;
   kicker: string;
-  onMessageCreated: () => void;
   refreshToken: number;
   statusLines: readonly string[];
 }
 
-function FactionColumn({
+function FactionFeedPanel({
   accent,
-  count,
   faction,
-  identity,
   isActive,
   kicker,
-  onMessageCreated,
   refreshToken,
   statusLines,
-}: FactionColumnProps) {
+}: FactionFeedPanelProps) {
   return (
     <section
-      className={`tlhn-faction-column tlhn-faction-column-${accent}`}
+      className={`tlhn-faction-feed-panel tlhn-faction-feed-panel-${accent}`}
       data-active={isActive}
       aria-labelledby={`${faction}-title`}
     >
-      <p className="tlhn-network-kicker">{kicker}</p>
-      <h2 id={`${faction}-title`} className="tlhn-faction-title">
-        {FACTION_DISPLAY_NAMES[faction]}
-      </h2>
-      <FactionTallyDisplay accent={accent} count={count} faction={faction} />
-      <div className="tlhn-faction-meter" aria-hidden="true" />
+      <div className="tlhn-faction-feed-heading">
+        <div>
+          <p className="tlhn-network-kicker">{kicker}</p>
+          <h3 id={`${faction}-title`} className="tlhn-faction-title">
+            {FACTION_DISPLAY_NAMES[faction]}
+          </h3>
+        </div>
+        <div className="tlhn-faction-meter" aria-hidden="true" />
+      </div>
       <ul className="tlhn-faction-status">
         {statusLines.map((line) => (
           <li key={line}>{line}</li>
         ))}
       </ul>
       <ChatPanel accent={accent} faction={faction} refreshToken={refreshToken} />
-      {identity && (
-        <MessageComposer
-          accent={accent}
-          identity={identity}
-          onMessageCreated={onMessageCreated}
-        />
-      )}
     </section>
   );
 }
