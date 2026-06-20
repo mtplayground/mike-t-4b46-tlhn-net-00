@@ -1,77 +1,182 @@
-# Architecture plan for Issues #57-#60
+# Architecture plan for Issues #65-#76
 
-Product: The Last Human Network (TLHN), a TypeScript npm-workspace monorepo with a Vite React frontend, Express backend, shared DTO/contracts package, Tailwind styling, Drizzle ORM, and PostgreSQL persistence.
+Product: The Last Human Network (TLHN). Keep product/faction naming from `PRODUCT.md` and `shared/src/index.ts`: `The Last Human Network`, `TLHN`, `AI Haters`, and `AI Lovers`.
 
-## Relevant module structure
+This work has two coordinated tracks:
+
+1. Frontend network-page redesign in the existing Vite/React/Tailwind app (#65-#68).
+2. Backend migration from the legacy TypeScript/Express API to a Rust Axum API while preserving the existing PostgreSQL schema and API behavior (#69-#76).
+
+## Target module structure
+
+### Frontend: `frontend/`
 
 - `frontend/src/App.tsx`
-  - Owns the manual SPA routing, `/network` layout, `CountdownTimer`, `CountdownUnit`, `FactionColumn`, `ChatPanel`, `MessageComposer`, local identity state, polling, and UI helpers.
-  - Issues #57, #59, and #60 require coordinated changes here so the countdown can move out of the center utility column and chat feeds can support cursor-based upward history loading.
+  - Current home/network SPA routing and most UI state live here.
+  - Issues #65-#68 should refactor the `/network` JSX into a stacked full-width page while preserving existing local identity, polling, cooldown, subscription, countdown, and API-call behavior.
+  - If the file grows further, extract components into `frontend/src/components/` during the layout work only when it reduces risk:
+    - `NetworkHeader.tsx`
+    - `CountdownBand.tsx`
+    - `FactionTallyCards.tsx`
+    - `CombinedChatPanel.tsx`
+    - `SubscriptionFooter.tsx`
 - `frontend/src/styles.css`
-  - Tailwind component layer for the three-column network grid, countdown, chat panels, and scrollable message list.
-  - Main target for Issue #57's full-width countdown band and Issue #58's taller chat viewport.
+  - Tailwind component-layer definitions for TLHN visual language.
+  - Primary styling target for the single-column layout, full-width bands, unified feed, tallies, subscription row, and footer.
+- `frontend/src/config.ts`
+  - Keep existing `VITE_POLLING_INTERVAL_MS` and `VITE_COUNTDOWN_DEADLINE_ISO` parsing.
+
+### Shared TypeScript contracts: `shared/`
+
+Keep `shared/` as the frontend-facing TypeScript contract package until the final cleanup issue.
+
+- `shared/src/index.ts`
+  - Product names, defaults, and faction constants remain the source of truth for the React app.
 - `shared/src/messages.ts`
-  - Shared Zod query schema and DTOs for `GET /api/messages`.
-  - Issue #59 should update this first to add `limit`, `before_id`, and `has_more` in the response contract.
-- `backend/src/routes/messages.ts`
-  - Express route backed by Drizzle/PostgreSQL for listing and creating messages.
-  - Issue #59 should implement cursor filtering, `limit + 1` fetches, and `has_more` computation here.
-- `backend/src/app.test.ts` and `backend/src/e2e.test.ts`
-  - Backend integration/e2e coverage; Issue #59 should add pagination tests with more than 25 messages and a `before_id` page turn.
-- `backend/src/db/schema.ts`
-  - Existing `messages` table has `id`, `faction`, `createdAt`, and indexes on faction/createdAt. No migration is expected for cursor pagination because `id` already exists and is the cursor.
+  - Preserve the existing list/create message DTOs, including pagination fields already described in `PRODUCT.md`: `limit`, `before_id`, and `has_more`.
+- `shared/src/factions.ts` and `shared/src/subscriptions.ts`
+  - Preserve request/response shapes used by the frontend.
 
-## Issue plan
+Rust code should mirror these DTOs with serde structs and snake_case JSON rather than trying to import TypeScript directly.
 
-### Issue #57: Move the countdown into a full-width band spanning the network page
+### Rust backend: `backend/`
 
-- In `NetworkPage`, render `<CountdownTimer />` as its own full-width grid item rather than inside `.tlhn-network-utility`.
-- Keep the heading text `TIME LEFT UNTIL AI DOMINATES THE WORLD` with the countdown component.
-- Update `.tlhn-network-layout` / countdown CSS so the countdown band spans all columns on large screens and the page width on smaller screens.
-- Remove or replace the current early `min-width: 1280px` four-column countdown media rule that causes clipping/overflow.
-- Preserve existing countdown config from `clientConfig.countdownDeadlineIso` and visual TLHN styling.
+Issue #69 should replace the Node backend package contents with a Rust crate while leaving frontend/shared workspaces intact until #76.
 
-### Issue #58: Size chat feed viewport to show ~15 messages before scrolling
+Recommended layout:
 
-- Update `.tlhn-chat-list` in `frontend/src/styles.css` by removing the short fixed `h-80`-style constraint and using a max height around fifteen rows, e.g. `max-height: calc(15 * 4rem)`.
-- Keep `overflow-y-auto` and add/keep `overscroll-contain` so only the feed scrolls when history grows.
-- Confirm the surrounding `.tlhn-chat-panel` layout still allows the message composer and faction column to fit responsively.
+- `backend/Cargo.toml`
+- `backend/src/main.rs`
+  - Load config, initialize tracing, connect Postgres pool, build Axum app, bind `HOST:PORT`, and handle graceful shutdown.
+- `backend/src/config.rs`
+  - Parse `DATABASE_URL` (required), `HOST`, `PORT`, `POLLING_INTERVAL_MS`, `COUNTDOWN_DEADLINE_ISO`.
+  - Preserve current `sslmode=require` normalization semantics where needed for the chosen Postgres client.
+- `backend/src/app.rs`
+  - Axum router composition and middleware stack.
+  - Mount `/api/*` routes before static frontend fallback.
+- `backend/src/db.rs`
+  - Postgres pool creation and shared query helpers.
+- `backend/src/error.rs`
+  - Central API error type, status mapping, and logging/tracing before generic 500s.
+- `backend/src/models.rs`
+  - Rust DTOs matching shared TypeScript contracts and database rows.
+- `backend/src/routes/health.rs`
+- `backend/src/routes/factions.rs`
+- `backend/src/routes/messages.rs`
+- `backend/src/routes/subscriptions.rs`
+- `backend/src/services/display_name.rs`
+- `backend/src/services/rate_limit.rs`
+- `backend/src/static_files.rs`
+  - Serve `frontend/dist` and SPA fallback to `index.html` after API routes.
+- `backend/tests/`
+  - Rust integration tests replacing the Node tests in #75.
 
-### Issue #59: Add cursor-based pagination to the messages list API
+### Database and migrations
 
-- Update `shared/src/messages.ts`:
-  - Extend `listMessagesQuerySchema` with `limit` and `before_id` query params, parsing string query values into bounded integers.
-  - Add `has_more: boolean` to `ListMessagesResponse`.
-- Update `backend/src/routes/messages.ts`:
-  - Default `limit` to 25 and cap at 50.
-  - If `before_id` is present, filter messages to ids older than the cursor for the selected faction/global query.
-  - Fetch `limit + 1`, return only `limit`, and set `has_more` based on the extra row.
-  - Preserve newest-first API ordering because Issue #60 can transform display order client-side.
-- Update tests to verify default size, max cap, `before_id`, `has_more`, invalid query validation, and faction isolation.
+- PostgreSQL remains required; `DATABASE_URL` is the runtime source.
+- Reuse the existing schema and migrations under `backend/drizzle/` or move SQL files to a Rust-owned migrations directory during #70 only if the selected client requires it.
+- Existing tables/enums to preserve exactly:
+  - `faction` enum: `ai_haters`, `ai_lovers`
+  - `messages(id, faction, display_name, body, user, created_at)`
+  - `subscriptions(id, email, created_at)`
+  - `faction_counts(faction, count)`
+- Do not introduce SQLite, JSON-file persistence, in-memory production storage, or Fly volumes.
 
-### Issue #60: Scroll-up infinite history loading in chat feeds
+## Issue dependency plan
 
-- Refactor `ChatPanel` state in `frontend/src/App.tsx` to track loaded messages, loading states, pagination cursor, and `hasMore`.
-- Initial load should request the latest 25 messages for the faction.
-- Render feed oldest-to-newest so the newest messages sit at the bottom while the API can remain newest-first.
-- Add an `onScroll` handler/ref on `.tlhn-chat-list`; when the user nears the top and `hasMore` is true, request `before_id` equal to the oldest loaded id.
-- Prepend older messages while preserving scroll position by measuring scroll height before/after insertion.
-- Keep live polling active for new messages, dedupe by `id`, and append new arrivals without disrupting older-history loads.
-- Guard against concurrent history fetches and abort/cancel effects on unmount or faction changes.
+### #65 Refactor network page to single-column full-width layout with top header
 
-## Dependencies and sequencing
+- Frontend-only layout restructuring.
+- Replace the three-column `.tlhn-network-layout` with a stacked full-width layout.
+- Add top header with TLHN brand on the left and `ABOUT TLHN` / `JOIN THE NETWORK` actions on the right.
+- Preserve existing SPA route handling and faction-selection modal behavior.
 
-1. Issue #57 can be implemented independently and is frontend layout-only.
-2. Issue #58 can be implemented independently but should be validated again after Issue #60 because infinite history depends on the same scroll container.
-3. Issue #59 must precede Issue #60 because the frontend infinite-scroll feature depends on `limit`, `before_id`, and `has_more` from the API/shared DTOs.
-4. Issue #60 should be last; it consumes the Issue #59 contract and should preserve Issue #58's viewport behavior.
+### #66 Merge faction chat panels into one unified scrollable feed
+
+- Depends on the layout direction from #65.
+- Replace two `ChatPanel` instances with a single `CombinedChatPanel`.
+- Fetch all messages without a faction filter and merge into one time-ordered list.
+- Preserve polling, pagination/history loading, scroll containment, display names, relative timestamps, and faction coloring.
+- Add faction visual markers using CSS/text/iconography; no user-uploaded avatar storage is required.
+
+### #67 Restyle faction tallies as two side-by-side cards
+
+- Depends on #65.
+- Reuse `GET /api/factions/counts` and existing polling.
+- Render AI HATERS and AI LOVERS as two cards with red/blue neon numerals and sublabels.
+
+### #68 Always-visible full-width subscription footer + bottom site footer
+
+- Depends on #65.
+- Move subscription form to a full-width footer row below the feed/composer.
+- Preserve `/api/subscriptions` submit, validation, duplicate, and error states.
+- Add bottom site footer with required copyright and navigation/social labels.
+
+### #69 Scaffold the Rust Axum backend crate and wire it into the workspace
+
+- Start backend migration.
+- Add Axum 0.8, Tokio, tower-http, serde, tracing, and a Postgres client (`sqlx` or `tokio-postgres`).
+- Add config parsing for `DATABASE_URL`, `HOST`, `PORT`, polling interval, and countdown deadline.
+- Keep the crate buildable before all routes are complete.
+
+### #70 PostgreSQL connectivity, schema alignment, and health endpoint
+
+- Depends on #69.
+- Connect Rust backend to PostgreSQL.
+- Reuse current schema/migrations with no schema change.
+- Implement `GET /api/health` with `select 1`, product/API/database status, and `503` on DB failure.
+
+### #71 Factions endpoints in Rust
+
+- Depends on #70.
+- Implement `GET /api/factions/counts` and `POST /api/factions/:faction/join`.
+- Preserve validation, cookie names, cookie scope, SameSite/Secure behavior, idempotent join, count increment, and generated `prefix_xxxxx` display names.
+
+### #72 Messages endpoints in Rust
+
+- Depends on #70 and should align with #66 frontend needs.
+- Implement `GET /api/messages?faction=&limit=&before_id=` returning `{ messages, has_more }` newest-first.
+- Implement `POST /api/messages` with existing validation and in-memory 30s per-client cooldown.
+- Preserve IP-ish rate-limit key header order and 429 retry metadata.
+- Continue storing `user` as null.
+
+### #73 Subscriptions endpoint in Rust
+
+- Depends on #70.
+- Implement `POST /api/subscriptions` with lowercase email validation and `on conflict do nothing` dedupe semantics.
+- Return `201` for new subscriptions and `200` for duplicates with `already_subscribed`.
+
+### #74 Static frontend serving, SPA fallback, and middleware
+
+- Depends on #69 and should be integrated after core API routing exists.
+- Serve `frontend/dist` assets.
+- Add SPA fallback to `index.html` after `/api/*` routes.
+- Apply equivalent CORS, compression, security headers, and request tracing.
+
+### #75 Rust integration tests replacing the Node test suite
+
+- Depends on #70-#74.
+- Port coverage for health, faction join idempotency, message validation, pagination, cooldown/429, subscription dedupe, and an end-to-end flow.
+- Prefer tests that exercise the Axum router directly plus a test database strategy compatible with CI/deploy expectations.
+
+### #76 Remove old TS/Express backend and update root scripts
+
+- Final cleanup after Rust routes/static serving/tests are complete.
+- Delete legacy Express backend source and Node backend tests.
+- Update root scripts so:
+  - `npm run build` builds `shared`, Rust backend, and frontend.
+  - `npm start` runs the Rust binary.
+  - DB scripts/docs match the Rust migration approach.
+- Keep `shared/` and `frontend/` intact.
 
 ## Key design decisions
 
-- Keep product/faction language from `PRODUCT.md` and shared constants: `The Last Human Network`, `TLHN`, `AI Haters`, and `AI Lovers`.
-- Use PostgreSQL/Drizzle already present in the app; no new database technology or migration is needed for these issues.
-- Keep cursor pagination based on monotonic message `id` rather than timestamp to avoid duplicate/ambiguous cursors.
-- Prefer shared schema/type changes first for API work, then backend implementation, then frontend consumption.
-- Maintain existing security/validation patterns: Zod for request validation, JSON errors, and backend tests for API changes.
-- Avoid adding new frontend dependencies; React hooks/refs are sufficient for scroll preservation and polling coordination.
-- Validation after each issue should include `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when feasible.
+- Preserve the public API paths and JSON shapes so the frontend can migrate independently of the backend implementation.
+- Use PostgreSQL as the only persistent store. The project explicitly requires Postgres via `DATABASE_URL` and existing schema reuse.
+- Use Rust serde structs with `rename_all = "snake_case"` or explicit field renames to match the TypeScript DTOs.
+- Keep message pagination based on message `id` cursor (`before_id`) for deterministic history loading.
+- Keep cooldown rate limiting in memory as requested; do not persist rate limits unless a later issue asks for distributed enforcement.
+- Mount API routes under `/api` before SPA fallback to avoid route collisions.
+- Maintain observability: request tracing and full error logging before generic 500 responses.
+- Avoid new frontend dependencies unless necessary; React hooks and existing Tailwind CSS are enough for #65-#68.
+- Validate after each issue with the relevant subset of checks, and before final cleanup with full build/lint/test coverage.
