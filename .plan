@@ -1,17 +1,16 @@
-# Architecture plan for Issue #121: Remove message-card padding and reduce chat panel left padding
+# Architecture plan for Issue #123: Remove the per-message faction label from chat messages
 
 ## Project/module structure
-- `frontend/src/App.tsx` renders the unified chat feed and message list markup. No component or data-flow changes are needed for this issue.
-- `frontend/src/styles.css` owns the Tailwind component-layer classes for the chat panel, chat list, and individual message cards. This is the only expected implementation surface.
-- `shared/src/*`, `backend/src/*`, and database migrations remain out of scope because the issue is purely visual and does not affect message schemas, APIs, or persistence.
+- `frontend/src/App.tsx` renders the unified chat feed. The per-message faction label is currently a `<span className="tlhn-chat-faction">` inside each message's metadata row.
+- `frontend/src/styles.css` contains the matching `.tlhn-chat-faction` style rule. That rule should be deleted once the markup is removed.
+- `shared/src/*`, `backend/src/*`, database migrations, and API models remain unchanged because message payloads still include faction data for avatar/name coloring and accessibility.
 
 ## Issue dependencies and sequencing
-- This issue has no dependencies and can be implemented independently.
-- The change should focus on the existing chat/feed styling introduced by earlier feed layout work, preserving existing rendering, polling, history loading, and accessibility behavior.
+- Issue #123 has no blocking dependencies.
+- The implementation should be isolated to the unified chat feed UI and its unused CSS cleanup.
 
 ## Key design decisions
-- Remove or minimize the inner padding on `.tlhn-chat-message` so message card content sits tighter within each card.
-- Reduce only the left padding on `.tlhn-chat-panel` while keeping top/right/bottom spacing stable, e.g. `py-3 pr-3 pl-1`.
-- Prefer a CSS-only adjustment in `frontend/src/styles.css`; avoid touching React markup unless visual validation shows a structural spacing source elsewhere.
-- Keep TLHN branding, copy, message ordering, avatars, faction labels, and timestamps unchanged.
-- Validate with the frontend/package build or lint command after implementation and inspect the chat panel at mobile/narrow widths where the requested padding reduction is most visible.
+- Remove only the visible per-message faction text (`AI Haters` / `AI Lovers`) from chat message metadata.
+- Preserve faction-colored display names, faction avatars, and the avatar `aria-label` exactly as requested.
+- Keep message fetching, posting, ordering, history loading, timestamps, and shared faction types unchanged.
+- Validate with the existing frontend/typecheck/build workflow after implementation.
