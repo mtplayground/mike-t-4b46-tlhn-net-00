@@ -21,6 +21,7 @@ import type {
 import type {
   CreateMessageResponse,
   ListMessagesResponse,
+  MessagePostFrequencyLimitResponse,
   MessagePostRateLimitResponse,
   MessageResponse,
 } from "@tlhn/shared/messages";
@@ -53,6 +54,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CHAT_PAGE_SIZE = 25;
 const CHAT_HISTORY_SCROLL_THRESHOLD_PX = 48;
 const CHAT_BOTTOM_SCROLL_THRESHOLD_PX = 80;
+const MESSAGE_POST_FREQUENCY_LIMIT_NOTICE_MS = 1_500;
 const INITIAL_FACTION_COUNTS: FactionCounts = {
   ai_haters: 0,
   ai_lovers: 0,
@@ -927,7 +929,7 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
   const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [submitState, setSubmitState] = useState<{
     errorMessage?: string;
-    status: "idle" | "submitting" | "error";
+    status: "idle" | "submitting" | "error" | "rate-limited";
   }>({ status: "idle" });
   const isSubmitting = submitState.status === "submitting";
   const cooldownRemainingMs = Math.max(0, (cooldownUntil ?? 0) - cooldownNow);
@@ -951,6 +953,18 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
 
     return () => window.clearInterval(intervalId);
   }, [cooldownUntil]);
+
+  useEffect(() => {
+    if (submitState.status !== "rate-limited") {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setSubmitState({ status: "idle" });
+    }, MESSAGE_POST_FREQUENCY_LIMIT_NOTICE_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [submitState.status]);
 
   const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -991,10 +1005,12 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
         | null;
 
       if (!response.ok) {
-        if (isRateLimitResponse(data)) {
-          setCooldownUntil(getRateLimitCooldownUntil(data));
-          setCooldownNow(Date.now());
-          throw new Error("Cooldown active. Wait for the timer before posting.");
+        if (isFrequencyLimitResponse(data)) {
+          setSubmitState({
+            errorMessage: getFrequencyLimitMessage(data),
+            status: "rate-limited",
+          });
+          return;
         }
 
         const message =
@@ -1062,37 +1078,37 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
           {submitState.errorMessage}
         </p>
       )}
+      {submitState.status === "rate-limited" && (
+        <p className="tlhn-message-composer-error" role="status">
+          {submitState.errorMessage}
+        </p>
+      )}
     </form>
   );
 }
 
-function isRateLimitResponse(
+function isFrequencyLimitResponse(
   value:
     | CreateMessageResponse
     | MessagePostRateLimitResponse
     | { error?: string }
     | null,
-): value is MessagePostRateLimitResponse {
+): value is MessagePostFrequencyLimitResponse {
   if (!value) {
     return false;
   }
 
   return (
     "error" in value &&
-    value.error === "Message post cooldown active" &&
-    "next_allowed_at" in value &&
-    typeof value.next_allowed_at === "string"
+    value.error === "Message post rate limit active" &&
+    "retry_after_seconds" in value &&
+    typeof value.retry_after_seconds === "number"
   );
 }
 
-function getRateLimitCooldownUntil(response: MessagePostRateLimitResponse): number {
-  const nextAllowedAt = Date.parse(response.next_allowed_at);
-
-  if (!Number.isNaN(nextAllowedAt)) {
-    return nextAllowedAt;
-  }
-
-  return Date.now() + Math.max(0, response.retry_after_ms);
+function getFrequencyLimitMessage(response: MessagePostFrequencyLimitResponse): string {
+  const retryAfterSeconds = Math.max(1, Math.ceil(response.retry_after_seconds));
+  return `Slow down — message frequency limit active. Try again in ${retryAfterSeconds}s.`;
 }
 
 interface FactionSelectionModalProps {
