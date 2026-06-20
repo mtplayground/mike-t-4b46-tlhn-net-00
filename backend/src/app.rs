@@ -1,11 +1,11 @@
 use crate::{
     config::ServerConfig,
-    routes::{factions, health::health},
+    routes::{factions, health::health, messages},
 };
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
@@ -18,6 +18,7 @@ use tower_http::{
 pub struct AppDependencies {
     pub config: Arc<ServerConfig>,
     pub db_pool: PgPool,
+    pub message_post_rate_limiter: Arc<Mutex<messages::MessagePostRateLimiter>>,
 }
 
 impl AppDependencies {
@@ -25,6 +26,9 @@ impl AppDependencies {
         Self {
             config: Arc::new(config),
             db_pool,
+            message_post_rate_limiter: Arc::new(Mutex::new(
+                messages::MessagePostRateLimiter::default(),
+            )),
         }
     }
 }
@@ -44,6 +48,7 @@ pub fn create_app(dependencies: AppDependencies) -> Router {
     Router::new()
         .route("/api/health", get(health))
         .route("/api/factions/counts", get(factions::counts))
+        .route("/api/messages", get(messages::list).post(messages::create))
         .route(
             "/api/factions/{faction}/join",
             axum::routing::post(factions::join),
