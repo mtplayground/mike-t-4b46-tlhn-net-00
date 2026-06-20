@@ -1,23 +1,21 @@
-Architecture plan for Issues #99 and #100
+Architecture plan for Issue #103: Add a site favicon
 
-Project shape
-- Monorepo with a Vite React frontend (`frontend/`), Rust Axum backend (`backend/`), and shared TypeScript DTO/constants package (`shared/`).
-- These issues are frontend layout-only changes centered in `frontend/src/App.tsx` and `frontend/src/styles.css`; no backend API, database schema, or shared DTO changes are expected.
-- Existing product branding and copy remain from PRODUCT.md: The Last Human Network / TLHN.
+Current structure:
+- frontend/: Vite React SPA with index.html as the HTML shell and src/ for app code/styles.
+- frontend/public/: Vite static assets copied verbatim to the production site root.
+- backend/: Rust Axum server that serves /api routes plus the built frontend/dist static assets.
+- shared/: TypeScript DTO/constants package shared by frontend code.
 
-Relevant frontend structure
-- `NetworkPage` in `frontend/src/App.tsx` owns the page section order: subscription, countdown, live tallies, feed, composer, footer utility row, and `SiteFooter`.
-- `FactionTallyDisplay` renders the AI Haters / AI Lovers tally cards; it depends on counts loaded from `/api/factions/counts`.
-- The Identity / Faction / Transmission values are rendered by `UtilityLine` instances inside `.tlhn-utility-stack` in the footer row.
-- Layout and responsive behavior are primarily CSS/Tailwind component classes in `frontend/src/styles.css`.
+Issue dependency plan:
+- Issue #103 is independent. It only touches the frontend static asset pipeline.
+- No backend, database, API, or shared DTO changes are required.
 
-Issue dependencies and sequencing
-- Issue #99 should move the existing `tlhn-network-tallies` section in `NetworkPage` to immediately before `<SiteFooter />`, after the utility/status footer row. It should not change the polling/data-fetching logic or `FactionTallyDisplay` API.
-- Issue #100 should modify `.tlhn-utility-stack` styling so the three utility lines render as a single responsive row: three columns on medium and larger screens, stacked on small screens.
-- The two issues are independent, but #99 touches the JSX order around the footer row and site footer, while #100 touches CSS for content inside that row. Implementing either first should be safe if the JSX class names are preserved.
+Design decisions:
+- Add the favicon as frontend/public/favicon.svg so Vite copies it to /favicon.svg during build.
+- Reference it in frontend/index.html with <link rel="icon" type="image/svg+xml" href="/favicon.svg" />.
+- Match TLHN branding from PRODUCT.md: dark cyber/glitch aesthetic, red neon TLHN mark, compact rounded tile.
+- Keep the SVG static and self-contained; no runtime dependencies or generated assets.
 
-Key design decisions
-- Keep changes minimal and layout-focused; do not introduce new state, routes, APIs, dependencies, or persistence.
-- Preserve accessibility labels/headings and existing section IDs (`network-about`, `network-join`) so anchor links and tests remain stable.
-- Reuse existing CSS class names where possible to avoid broad style regressions.
-- Validate with `npm run build`, `npm run lint`, `npm run format:check`, and `npm test` when implementing the individual issues.
+Validation:
+- Run npm run build to confirm Vite includes the public asset path and HTML remains valid.
+- Optionally curl /favicon.svg after deploy to confirm static serving through the Rust backend.

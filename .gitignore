@@ -11,8 +11,3 @@ node_modules/
 .pipeline-state.json
 .gitkeep
 .progress
-.env
-.env.local
-.env.production
-frontend/dist/
-shared/dist/
