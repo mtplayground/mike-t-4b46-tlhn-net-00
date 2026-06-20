@@ -8,12 +8,16 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::{HashMap, VecDeque},
+    time::{Duration, SystemTime},
+};
 use url::form_urlencoded;
 
 const DEFAULT_LIMIT: i64 = 25;
 const MAX_LIMIT: i64 = 50;
-const MESSAGE_POST_COOLDOWN_MS: u64 = 30_000;
+const MESSAGE_POST_FREQUENCY_LIMIT_WINDOW_MS: u64 = 1_000;
+const MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES: usize = 2;
 
 #[derive(Clone, Debug)]
 struct ListMessagesQuery {
@@ -64,7 +68,6 @@ pub struct ValidationErrorResponse {
 #[derive(Clone, Debug, Serialize)]
 pub struct MessagePostRateLimitResponse {
     pub error: &'static str,
-    pub cooldown_ms: u64,
     pub retry_after_ms: u64,
     pub retry_after_seconds: u64,
     pub next_allowed_at: String,
@@ -73,12 +76,11 @@ pub struct MessagePostRateLimitResponse {
 #[derive(Clone, Debug)]
 pub struct MessagePostRateLimitAllowed {
     pub key: String,
-    pub next_allowed_at: SystemTime,
+    pub reserved_at: SystemTime,
 }
 
 #[derive(Clone, Debug)]
 pub struct MessagePostRateLimitDenied {
-    pub cooldown_ms: u64,
     pub retry_after_ms: u64,
     pub retry_after_seconds: u64,
     pub next_allowed_at: SystemTime,
@@ -165,21 +167,26 @@ enum RateLimitDecision {
 
 #[derive(Debug)]
 pub struct MessagePostRateLimiter {
-    cooldown_ms: u64,
-    next_allowed_at_by_key: HashMap<String, SystemTime>,
+    max_messages_per_window: usize,
+    window: Duration,
+    reserved_at_by_key: HashMap<String, VecDeque<SystemTime>>,
 }
 
 impl Default for MessagePostRateLimiter {
     fn default() -> Self {
-        Self::new(MESSAGE_POST_COOLDOWN_MS)
+        Self::new(
+            MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES,
+            MESSAGE_POST_FREQUENCY_LIMIT_WINDOW_MS,
+        )
     }
 }
 
 impl MessagePostRateLimiter {
-    pub fn new(cooldown_ms: u64) -> Self {
+    pub fn new(max_messages_per_window: usize, window_ms: u64) -> Self {
         Self {
-            cooldown_ms,
-            next_allowed_at_by_key: HashMap::new(),
+            max_messages_per_window,
+            window: Duration::from_millis(window_ms),
+            reserved_at_by_key: HashMap::new(),
         }
     }
 
@@ -187,39 +194,56 @@ impl MessagePostRateLimiter {
         let now = SystemTime::now();
         self.delete_expired_entries(now);
 
-        if let Some(next_allowed_at) = self.next_allowed_at_by_key.get(&key).copied() {
-            if next_allowed_at > now {
-                let retry_after_ms = next_allowed_at
-                    .duration_since(now)
-                    .map(|duration| duration.as_millis().try_into().unwrap_or(u64::MAX))
-                    .unwrap_or(0);
-                return RateLimitDecision::Denied(MessagePostRateLimitDenied {
-                    cooldown_ms: self.cooldown_ms,
-                    retry_after_ms,
-                    retry_after_seconds: retry_after_ms.div_ceil(1_000),
-                    next_allowed_at,
-                });
-            }
+        let reservations = self.reserved_at_by_key.entry(key.clone()).or_default();
+        if reservations.len() >= self.max_messages_per_window {
+            let oldest_reserved_at = reservations.front().copied().unwrap_or(now);
+            let next_allowed_at = oldest_reserved_at + self.window;
+            let retry_after_ms = next_allowed_at
+                .duration_since(now)
+                .map(|duration| duration.as_millis().try_into().unwrap_or(u64::MAX))
+                .unwrap_or(0)
+                .max(1);
+            return RateLimitDecision::Denied(MessagePostRateLimitDenied {
+                retry_after_ms,
+                retry_after_seconds: retry_after_ms.div_ceil(1_000).max(1),
+                next_allowed_at,
+            });
         }
 
-        let next_allowed_at = now + std::time::Duration::from_millis(self.cooldown_ms);
-        self.next_allowed_at_by_key
-            .insert(key.clone(), next_allowed_at);
+        reservations.push_back(now);
         RateLimitDecision::Allowed(MessagePostRateLimitAllowed {
             key,
-            next_allowed_at,
+            reserved_at: now,
         })
     }
 
-    fn release(&mut self, key: &str, next_allowed_at: SystemTime) {
-        if self.next_allowed_at_by_key.get(key).copied() == Some(next_allowed_at) {
-            self.next_allowed_at_by_key.remove(key);
+    fn release(&mut self, key: &str, reserved_at: SystemTime) {
+        let mut remove_key = false;
+        if let Some(reservations) = self.reserved_at_by_key.get_mut(key) {
+            if let Some(index) = reservations
+                .iter()
+                .position(|reservation| *reservation == reserved_at)
+            {
+                reservations.remove(index);
+            }
+            remove_key = reservations.is_empty();
+        }
+        if remove_key {
+            self.reserved_at_by_key.remove(key);
         }
     }
 
     fn delete_expired_entries(&mut self, now: SystemTime) {
-        self.next_allowed_at_by_key
-            .retain(|_, next_allowed_at| *next_allowed_at > now);
+        self.reserved_at_by_key.retain(|_, reservations| {
+            while reservations
+                .front()
+                .and_then(|reserved_at| now.duration_since(*reserved_at).ok())
+                .is_some_and(|age| age >= self.window)
+            {
+                reservations.pop_front();
+            }
+            !reservations.is_empty()
+        });
     }
 }
 
@@ -450,8 +474,7 @@ fn send_rate_limit_response(
         StatusCode::TOO_MANY_REQUESTS,
         headers,
         Json(MessagePostRateLimitResponse {
-            error: "Message post cooldown active",
-            cooldown_ms: rate_limit.cooldown_ms,
+            error: "Message post rate limit active",
             retry_after_ms: rate_limit.retry_after_ms,
             retry_after_seconds: rate_limit.retry_after_seconds,
             next_allowed_at: system_time_to_iso(rate_limit.next_allowed_at),
@@ -461,7 +484,7 @@ fn send_rate_limit_response(
 
 fn release_rate_limit_reservation(state: &AppDependencies, allowed: &MessagePostRateLimitAllowed) {
     match state.message_post_rate_limiter.lock() {
-        Ok(mut limiter) => limiter.release(&allowed.key, allowed.next_allowed_at),
+        Ok(mut limiter) => limiter.release(&allowed.key, allowed.reserved_at),
         Err(error) => tracing::error!(
             name = "PoisonError",
             message = %error,
@@ -584,8 +607,8 @@ mod tests {
     }
 
     #[test]
-    fn rate_limiter_denies_repeated_reservation_and_releases() {
-        let mut limiter = MessagePostRateLimiter::new(30_000);
+    fn rate_limiter_allows_two_reservations_per_window_and_releases() {
+        let mut limiter = MessagePostRateLimiter::new(2, 1_000);
         let first = limiter.reserve("client".to_owned());
         let RateLimitDecision::Allowed(first) = first else {
             panic!("first reservation should be allowed");
@@ -593,10 +616,17 @@ mod tests {
 
         assert!(matches!(
             limiter.reserve("client".to_owned()),
-            RateLimitDecision::Denied(_)
+            RateLimitDecision::Allowed(_)
         ));
 
-        limiter.release(&first.key, first.next_allowed_at);
+        let third = limiter.reserve("client".to_owned());
+        let RateLimitDecision::Denied(third) = third else {
+            panic!("third reservation in the same window should be denied");
+        };
+        assert_eq!(third.retry_after_seconds, 1);
+        assert!((1..=1_000).contains(&third.retry_after_ms));
+
+        limiter.release(&first.key, first.reserved_at);
         assert!(matches!(
             limiter.reserve("client".to_owned()),
             RateLimitDecision::Allowed(_)
