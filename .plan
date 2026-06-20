@@ -1,16 +1,16 @@
-# Architecture plan for Issue #125: Reduce right-side padding of the chat message area
+# Architecture plan for Issue #127: Move chat padding from list wrappers into each message card
 
 ## Module structure, file organization, shared types
-- `frontend/src/styles.css` owns the Tailwind component-layer styles for the chat panel, message list, and combined feed spacing. This is the expected implementation surface.
-- `frontend/src/App.tsx` renders the unified chat feed and message cards, but no markup, state, polling, history-loading, or accessibility changes are required.
-- `shared/src/*`, `backend/src/*`, and database migrations remain out of scope because this is a CSS-only layout adjustment.
+- `frontend/src/styles.css` owns the Tailwind component-layer styles for the chat panel, message list, combined feed, and individual message cards. This issue should be implemented there.
+- `frontend/src/App.tsx` renders the unified feed markup, but no React state, data flow, routing, or accessibility changes are needed for this visual spacing adjustment.
+- `shared/src/*`, `backend/src/*`, and database migrations are out of scope because the issue does not change API contracts, persistence, or message models.
 
 ## Dependencies between issues
-- Issue #125 has no direct implementation dependency and can be applied independently.
-- It pairs with earlier left-padding work from Issue 5.12, so the new right-side values should keep the feed visually balanced with the already-reduced left padding.
+- Issue #127 has no blocking dependencies and can be implemented independently.
+- It follows the previous feed-spacing changes from Issues 5.12 / 5.13, changing the spacing strategy from wrapper-side padding to message-card padding.
 
 ## Key design decisions
-- Reduce right-side wrapper spacing so message cards can use more horizontal width: `.tlhn-chat-panel` `pr-3` to `pr-1`, remove `.tlhn-chat-list` `pr-1`, and reduce `.tlhn-chat-list-combined` `pr-2` to `pr-1`.
-- Keep `.tlhn-chat-message` itself at `p-0`; remaining horizontal whitespace is coming from wrappers rather than the message item.
-- Preserve existing TLHN styling, borders, scroll behavior, message ordering, avatars, display names, and timestamps.
-- Validate with the frontend build or lint/typecheck command after implementation.
+- Remove outer horizontal padding around the message list so cards can span the available feed width: set `.tlhn-chat-panel` horizontal padding to `px-0` while preserving vertical spacing, and set `.tlhn-chat-list-combined` to `pr-0`.
+- Add inner padding directly to each `.tlhn-chat-message` (`px-3 py-2`, or `px-4 py-2` if the existing visual rhythm needs more room) so message text and metadata do not sit against the card border.
+- Preserve the existing feed ordering, scroll behavior, faction colors, avatars, timestamps, and TLHN visual language.
+- Validate with the frontend/shared build and, when available, the full workspace build.
