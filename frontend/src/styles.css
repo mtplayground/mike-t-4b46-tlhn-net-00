@@ -182,9 +182,12 @@
     @apply mt-5;
   }
 
-  .tlhn-network-composer-section .tlhn-message-composer,
-  .tlhn-network-subscription-section .tlhn-subscription-form {
+  .tlhn-network-composer-section .tlhn-message-composer {
     @apply mt-5;
+  }
+
+  .tlhn-network-subscription-section {
+    @apply overflow-hidden border-hater-500/35 p-0 shadow-neon-hater;
   }
 
   .tlhn-network-empty-composer {
@@ -293,23 +296,49 @@
   }
 
   .tlhn-subscription-form {
-    @apply relative z-10 mt-4 rounded-lg border border-hater-500/30 bg-tlhn-void/70 p-3 font-terminal shadow-panel-glitch;
+    @apply relative z-10 grid gap-4 overflow-hidden bg-tlhn-void/70 px-4 py-4 font-terminal shadow-panel-glitch md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:px-28;
+  }
+
+  .tlhn-subscription-form::before,
+  .tlhn-subscription-form::after {
+    @apply pointer-events-none absolute top-1/2 hidden h-8 w-24 -translate-y-1/2 bg-hater-500/80 content-[''] md:block;
+    clip-path: polygon(
+      0 52%,
+      18% 52%,
+      28% 22%,
+      39% 82%,
+      50% 52%,
+      62% 52%,
+      72% 34%,
+      84% 68%,
+      100% 52%
+    );
+    filter: drop-shadow(0 0 10px rgba(255, 48, 72, 0.78));
+  }
+
+  .tlhn-subscription-form::before {
+    @apply left-4;
+  }
+
+  .tlhn-subscription-form::after {
+    @apply right-4;
+    transform: translateY(-50%) scaleX(-1);
   }
 
   .tlhn-subscription-copy {
-    @apply text-center uppercase;
+    @apply relative z-10 text-left uppercase;
   }
 
   .tlhn-subscription-copy p {
-    @apply m-0 text-xs font-bold text-tlhn-ash;
+    @apply m-0 text-xs font-bold tracking-[0.24em] text-tlhn-ash;
   }
 
   .tlhn-subscription-copy h2 {
-    @apply m-0 mt-1 text-xl font-black leading-none text-hater-500 text-glow-hater;
+    @apply m-0 mt-1 text-2xl font-black leading-none text-hater-500 text-glow-hater;
   }
 
   .tlhn-subscription-row {
-    @apply mt-3 grid gap-2;
+    @apply relative z-10 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto];
   }
 
   .tlhn-subscription-input {
@@ -762,6 +791,27 @@
 
   .tlhn-enter-network-button span {
     @apply relative;
+  }
+
+  .tlhn-site-footer {
+    @apply relative z-10 flex w-full flex-col gap-4 rounded-lg border border-tlhn-bone/10 bg-tlhn-void/65 px-5 py-5 font-terminal text-xs uppercase text-tlhn-ash shadow-panel-glitch sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .tlhn-site-footer p {
+    @apply m-0;
+  }
+
+  .tlhn-site-footer-links,
+  .tlhn-site-footer-social {
+    @apply flex flex-wrap items-center gap-3;
+  }
+
+  .tlhn-site-footer a {
+    @apply text-tlhn-ash no-underline transition duration-150 hover:text-hater-300 focus:outline-none focus:ring-2 focus:ring-hater-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
+  }
+
+  .tlhn-site-footer-social a {
+    @apply grid h-8 w-8 place-items-center rounded-full border border-tlhn-bone/15 bg-tlhn-panel/80 text-sm font-black text-tlhn-bone shadow-panel-glitch hover:border-hater-500 hover:text-hater-300;
   }
 
   .tlhn-faction-modal-backdrop {
