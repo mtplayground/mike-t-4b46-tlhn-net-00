@@ -164,11 +164,11 @@
     order: 1;
   }
 
-  .tlhn-network-feed-section {
+  .tlhn-network-tallies {
     order: 2;
   }
 
-  .tlhn-network-tallies {
+  .tlhn-network-feed-section {
     order: 3;
   }
 
