@@ -303,14 +303,8 @@ function NetworkPage() {
         <section
           className="tlhn-network-section tlhn-network-feed-section"
           id="network-join"
-          aria-labelledby="network-feed-title"
+          aria-label="Network transmissions"
         >
-          <div className="tlhn-network-section-heading">
-            <p className="tlhn-network-kicker">Open transmissions</p>
-            <h2 id="network-feed-title" className="tlhn-network-section-title">
-              Faction feeds
-            </h2>
-          </div>
           <CombinedChatPanel refreshToken={messageRefreshToken} />
         </section>
         <section
@@ -319,7 +313,10 @@ function NetworkPage() {
         >
           <div className="tlhn-network-section-heading">
             <p className="tlhn-network-kicker">Signal composer</p>
-            <h2 id="network-composer-title" className="tlhn-network-section-title">
+            <h2
+              id="network-composer-title"
+              className="tlhn-network-section-title tlhn-network-section-title-compact"
+            >
               Broadcast to the network
             </h2>
           </div>
@@ -753,11 +750,10 @@ function CombinedChatPanel({ refreshToken }: CombinedChatPanelProps) {
   };
 
   return (
-    <section className="tlhn-chat-panel tlhn-chat-panel-combined">
-      <div className="tlhn-chat-panel-header">
-        <h3>Unified network feed</h3>
-        <span>Haters + Lovers</span>
-      </div>
+    <section
+      className="tlhn-chat-panel tlhn-chat-panel-combined"
+      aria-label="Unified network feed"
+    >
       {status === "error" ? (
         <p className="tlhn-chat-state tlhn-chat-state-error" role="alert">
           &gt;_ {errorMessage}
@@ -792,11 +788,11 @@ function CombinedChatPanel({ refreshToken }: CombinedChatPanelProps) {
               >
                 <div className="tlhn-chat-meta">
                   <span
-                    aria-label={`${FACTION_DISPLAY_NAMES[message.faction]} avatar`}
+                    aria-label={`${FACTION_DISPLAY_NAMES[message.faction]} faction logo`}
                     className={`tlhn-chat-avatar tlhn-chat-avatar-${accent}`}
                     role="img"
                   >
-                    {getFactionAvatar(message.faction)}
+                    <FactionLogo faction={message.faction} />
                   </span>
                   <strong className={`tlhn-chat-name tlhn-chat-name-${accent}`}>
                     {message.display_name}
@@ -1232,8 +1228,62 @@ function getFactionAccent(faction: Faction): "hater" | "lover" {
   return faction === "ai_haters" ? "hater" : "lover";
 }
 
-function getFactionAvatar(faction: Faction): string {
-  return faction === "ai_haters" ? "✊" : "🧠";
+interface FactionLogoProps {
+  faction: Faction;
+}
+
+function FactionLogo({ faction }: FactionLogoProps) {
+  if (faction === "ai_haters") {
+    return (
+      <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+        <path
+          d="M7 17.5 3.8 14.3m24.4 0L25 17.5M10.2 14.4l3.1-3.1m5.4 0 3.1 3.1"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="2.4"
+        />
+        <path
+          d="M10.8 16.1c0-2.1 1.7-3.8 3.8-3.8h2.8c2.1 0 3.8 1.7 3.8 3.8v1.4h1.1c1.6 0 2.9 1.3 2.9 2.9 0 3.7-3 6.6-6.6 6.6h-5.2c-3.7 0-6.6-3-6.6-6.6 0-1.6 1.3-2.9 2.9-2.9h1.1v-1.4Z"
+          fill="currentColor"
+        />
+        <path
+          d="M12.2 6.2v7.1m3.8-8.5v7.5m3.8-6.1v7.1"
+          fill="none"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="2.4"
+        />
+      </svg>
+    );
+  }
+
+  return (
+    <svg aria-hidden="true" viewBox="0 0 32 32" focusable="false">
+      <path
+        d="M16 26.5S6.5 20.8 6.5 12.9c0-3.2 2.5-5.7 5.6-5.7 1.8 0 3.2.8 3.9 2.1.7-1.3 2.1-2.1 3.9-2.1 3.1 0 5.6 2.5 5.6 5.7 0 7.9-9.5 13.6-9.5 13.6Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinejoin="round"
+        strokeWidth="2.3"
+      />
+      <path
+        d="M16 6V2.8m0 26.4V26m-9.2-9.8H3.4m25.2 0h-3.4m-2.6-9 2.2-2.2M7.2 27l2.2-2.2m15.4 2.2-2.2-2.2M7.2 5l2.2 2.2"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12.2 16h2.5l1.1-3.1 1.7 5.5 1.1-2.4h1.9"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
 }
 
 interface NetworkTopHeaderProps {
@@ -1322,6 +1372,17 @@ function formatRelativeTime(value: string, now: number): string {
 
   if (minutes < 1) {
     return "now";
+  }
+
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days >= 1) {
+    return `${days}d ${hours % 24}h ago`;
+  }
+
+  if (hours >= 1) {
+    return `${hours}h ${minutes % 60}m ago`;
   }
 
   return `${minutes}m ago`;
