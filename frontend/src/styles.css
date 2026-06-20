@@ -228,7 +228,7 @@
   }
 
   .tlhn-network-title {
-    @apply text-4xl sm:text-5xl lg:text-center;
+    @apply mt-0 text-4xl sm:text-5xl lg:text-center;
   }
 
   .tlhn-network-notice {
