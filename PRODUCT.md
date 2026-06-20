@@ -29,9 +29,10 @@ PostgreSQL-backed state in a monorepo.
 - Unified scrollable faction feed polls `/api/messages` without a faction
   filter, renders both factions in one time-ordered list without extra feed
   headings, colors display names by faction, and uses red broken-fist and blue
-  circuit-heart faction logos instead of generic avatars. The feed is visually
-  tight: the chat panel has reduced left padding and each message card has no
-  inner padding.
+  circuit-heart faction logos instead of generic avatars. Individual messages do
+  not repeat the `AI Haters` / `AI Lovers` faction label as visible text. The
+  feed is visually tight: the chat panel has reduced left padding and each
+  message card has no inner padding.
 - Chat feed initially loads the latest 25 messages, renders oldest-to-newest so
   the newest message sits at the bottom, supports scroll-up infinite history
   loading via `before_id` while preserving scroll position, and formats relative
