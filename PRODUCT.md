@@ -1,55 +1,62 @@
 # The Last Human Network
 
-The Last Human Network (TLHN) is a self-hosted TypeScript web app about the
-fictional Human Collapse and the split between AI Haters and AI Lovers. It ships
-as a Vite React frontend served by an Express API backend, with shared
-TypeScript contracts and PostgreSQL-backed state in a monorepo.
+The Last Human Network (TLHN) is a self-hosted web app about the fictional Human
+Collapse and the split between AI Haters and AI Lovers. It ships as a Vite React
+SPA served by a Rust Axum backend, with shared TypeScript DTO contracts and
+PostgreSQL-backed state in a monorepo.
 
 ## Current Product
 
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
-- `/network` SPA route with AI Haters on the left, a utility core in the center,
-  AI Lovers on the right, and a full-width countdown band spanning the network
-  page above the columns.
+- `/network` SPA route with a single-column full-width layout: top TLHN header
+  with `ABOUT TLHN` and `JOIN THE NETWORK` actions, countdown band, live tally
+  cards, unified feed, composer, subscription row, utility/footer rows.
 - Required faction-selection modal on first network entry. Joining assigns a
-  generated `prefix_xxxxx` display name, increments faction tallies, and stores
-  the selected faction/name in browser localStorage for the session experience.
-- Faction chat panels poll `/api/messages` about every 5 seconds, show display
-  names, message bodies, and relative timestamps, and keep feed headers focused
-  on the faction feed name.
-- Chat feeds initially load the latest 25 messages, render oldest-to-newest so
-  the newest message sits at the bottom, and support scroll-up infinite history
-  loading via `before_id` while preserving scroll position. The viewport is
-  internally scrollable, overscroll-contained, and sized for roughly 15 message
-  rows before scrolling.
+  generated `prefix_xxxxx` display name, increments faction tallies, sets
+  HttpOnly faction/name cookies through the API, and stores the identity in
+  browser localStorage for the session experience.
+- Unified scrollable faction feed polls `/api/messages` without a faction
+  filter, renders both factions in one time-ordered list, colors display names
+  by faction, and shows faction avatars without comment/like icons.
+- Chat feed initially loads the latest 25 messages, renders oldest-to-newest so
+  the newest message sits at the bottom, and supports scroll-up infinite history
+  loading via `before_id` while preserving scroll position.
 - Message composer posts as the selected faction/name, enforces a 30-second
-  cooldown in the UI, and handles backend 429 responses gracefully.
-- Live red/blue faction tally displays poll `/api/factions/counts`.
+  cooldown in the UI, and handles backend 429 responses with retry metadata.
+- Live faction tally cards poll `/api/factions/counts` and render AI Haters in
+  red with `HUMANS FIGHTING BACK`, AI Lovers in blue with `EMBRACING THE FUTURE`,
+  and large neon numerals.
 - Flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
-  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment. Its
-  neon tile band is full-width on the network page so all day/hour/minute/second
-  tiles avoid clipping at responsive widths.
-- Email subscription form posts to `/api/subscriptions`, validates client-side,
-  and shows success, duplicate, and error states.
+  2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment.
+- Full-width neon subscription row posts to `/api/subscriptions`, validates
+  client-side, and shows success, duplicate, and error states.
+- Bottom footer shows `© 2025 TLHN. All rights reserved.`, Manifesto/Privacy/
+  Terms/Contact links, and X/Discord icons.
 
 ## Architecture
 
 - Monorepo packages:
   - `frontend/`: Vite React SPA and Tailwind TLHN visual system.
-  - `backend/`: Express API and static frontend host.
+  - `backend/`: Rust Axum API server, static frontend host, SQL migrations, and
+    Rust integration tests.
   - `shared/`: cross-package constants, Zod schemas, DTO types, and product
     names.
-- Express serves API routes under `/api/*` and serves `frontend/dist` after
-  `npm run build`.
+- Root JavaScript workspaces are `frontend` and `shared`; the backend is built
+  with Cargo from `backend/Cargo.toml`.
+- `npm run build` builds shared types, the Rust backend, and the frontend.
+  `npm start` runs the Rust backend binary.
+- Rust Axum serves API routes under `/api/*`, serves `frontend/dist`, and falls
+  back non-API paths to `index.html` for SPA routing.
+- Middleware includes mirrored-origin credentialed CORS, compression, request
+  tracing, static serving, and security headers.
 - Runtime server defaults to `HOST=0.0.0.0` and `PORT=8080`.
-- Persistent state is PostgreSQL only. The backend uses Drizzle ORM with `pg`;
-  SQLite, JSON-file persistence, in-memory production storage, and Fly volumes
-  are not part of this project.
+- Persistent state is PostgreSQL only via `sqlx`; SQLite, JSON-file persistence,
+  in-memory production storage, and Fly volumes are not part of this project.
 - Database-backed features include messages, faction counts, and subscriptions.
-- `/api/health` reports API and PostgreSQL health. Database health failures are
-  logged server-side and returned as structured JSON.
+- `/api/health` reports API, product, and PostgreSQL health and returns `503`
+  when the database check fails.
 
 ## API Surface
 
@@ -57,6 +64,7 @@ TypeScript contracts and PostgreSQL-backed state in a monorepo.
 - `GET /api/factions/counts`
 - `POST /api/factions/:faction/join`
 - `GET /api/messages?faction=ai_haters|ai_lovers&limit=25&before_id=123`
+  - `faction` is optional; omitted means the combined feed.
   - Returns `{ messages, has_more }` newest-first.
   - `limit` defaults to 25 and is capped at 50.
   - `before_id` pages older messages using the message id cursor.
@@ -65,8 +73,8 @@ TypeScript contracts and PostgreSQL-backed state in a monorepo.
 
 ## Conventions
 
-- Product names come from `shared/src/index.ts`:
-  `The Last Human Network` and `TLHN`.
+- Product names come from `shared/src/index.ts`: `The Last Human Network` and
+  `TLHN`.
 - Factions are exactly `ai_haters` and `ai_lovers`; UI labels are `AI Haters`
   and `AI Lovers`.
 - Visual language is dark cyber-terminal: red Hater neon, blue Lover neon,
@@ -89,6 +97,8 @@ npm run format:check
 npm test
 ```
 
-`npm test` includes type checks plus backend integration and end-to-end API flow
-tests for faction join, message posting, cooldown handling, message pagination,
-polling reads, tallies, and subscription dedupe.
+`npm test` runs TypeScript type checks plus Rust integration tests. The Rust
+integration tests start a local PostgreSQL 16 instance, apply the checked-in SQL
+migrations, and cover health, faction join idempotency, message validation,
+pagination, cooldown handling, subscription dedupe, SPA fallback, and an
+end-to-end API flow.
