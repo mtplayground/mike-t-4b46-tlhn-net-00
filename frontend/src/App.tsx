@@ -444,13 +444,21 @@ interface FactionTallyDisplayProps {
 }
 
 function FactionTallyDisplay({ accent, count, faction }: FactionTallyDisplayProps) {
+  const sublabel =
+    faction === "ai_haters" ? "HUMANS FIGHTING BACK" : "EMBRACING THE FUTURE";
+
   return (
-    <div className={`tlhn-faction-tally tlhn-faction-tally-${accent}`}>
-      <span className="tlhn-faction-tally-label">
-        {FACTION_DISPLAY_NAMES[faction]} online
-      </span>
-      <strong className="tlhn-faction-tally-value">{formatFactionCount(count)}</strong>
-    </div>
+    <article className={`tlhn-faction-tally tlhn-faction-tally-${accent}`}>
+      <div className="tlhn-faction-tally-copy">
+        <span className="tlhn-faction-tally-label">
+          {FACTION_DISPLAY_NAMES[faction]}
+        </span>
+        <span className="tlhn-faction-tally-sublabel">{sublabel}</span>
+      </div>
+      <strong className="tlhn-faction-tally-value" aria-label={`${count} online`}>
+        {formatFactionCount(count)}
+      </strong>
+    </article>
   );
 }
 
