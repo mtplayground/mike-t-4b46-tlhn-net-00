@@ -102,7 +102,7 @@ function AppShell({ children, currentRoute, onNavigate }: AppShellProps) {
     <div className="tlhn-screen tlhn-shell">
       <header className="tlhn-shell-header" aria-label="Primary">
         <a
-          className="font-terminal text-sm font-bold uppercase text-hater-500 text-glow-hater"
+          className="font-terminal text-lg font-bold uppercase text-hater-500 text-glow-hater sm:text-xl"
           href="/"
           onClick={createRouteClickHandler("/", onNavigate)}
         >
