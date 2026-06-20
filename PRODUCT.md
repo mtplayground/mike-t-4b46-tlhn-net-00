@@ -48,15 +48,21 @@ PostgreSQL-backed state in a monorepo.
 - `npm run build` builds shared types, the Rust backend, and the frontend.
   `npm start` runs the Rust backend binary.
 - Rust Axum serves API routes under `/api/*`, serves `frontend/dist`, and falls
-  back non-API paths to `index.html` for SPA routing.
+  back non-API paths to `index.html` for SPA routing. Static asset resolution
+  supports both repo-local execution and the Sprite runtime layout at
+  `/opt/app/frontend/dist`.
 - Middleware includes mirrored-origin credentialed CORS, compression, request
   tracing, static serving, and security headers.
-- Runtime server defaults to `HOST=0.0.0.0` and `PORT=8080`.
+- Runtime server defaults to `HOST=0.0.0.0` and `PORT=8080`; production start
+  uses the release Rust binary at `target/release/tlhn-backend`.
 - Persistent state is PostgreSQL only via `sqlx`; SQLite, JSON-file persistence,
   in-memory production storage, and Fly volumes are not part of this project.
 - Database-backed features include messages, faction counts, and subscriptions.
 - `/api/health` reports API, product, and PostgreSQL health and returns `503`
   when the database check fails.
+- Startup logging emits an INFO-only deployment separator so verifier log tails
+  clearly reflect the current Rust service rather than stale historical process
+  output.
 
 ## API Surface
 
