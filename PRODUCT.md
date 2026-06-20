@@ -31,8 +31,11 @@ PostgreSQL-backed state in a monorepo.
   the newest message sits at the bottom, supports scroll-up infinite history
   loading via `before_id` while preserving scroll position, and formats relative
   timestamps as minutes, hours/minutes, or days/hours.
-- Message composer posts as the selected faction/name, enforces a 30-second
-  cooldown in the UI, and handles backend 429 responses with retry metadata.
+- Message composer posts as the selected faction/name and enforces a
+  30-second cooldown strictly in the client UI after successful posts. The
+  server separately applies a transient frequency limiter of at most two
+  messages per client per second; its `429` response shows a brief "slow down"
+  notice without starting the 30-second cooldown.
 - Compact live faction tally cards poll `/api/factions/counts`, sit immediately
   below the countdown, and render AI Haters in red with `HUMANS FIGHTING BACK`,
   AI Lovers in blue with `EMBRACING THE FUTURE`, and neon numerals.
@@ -89,6 +92,10 @@ PostgreSQL-backed state in a monorepo.
   - `limit` defaults to 25 and is capped at 50.
   - `before_id` pages older messages using the message id cursor.
 - `POST /api/messages`
+  - Accepts at most two messages per client key in a sliding one-second window.
+  - The third immediate post returns `429`, `Retry-After: 1`, and
+    `retry_after_ms` / `retry_after_seconds` metadata with
+    `Message post rate limit active`.
 - `POST /api/subscriptions`
 
 ## Conventions
@@ -120,5 +127,5 @@ npm test
 `npm test` runs TypeScript type checks plus Rust integration tests. The Rust
 integration tests start a local PostgreSQL 16 instance, apply the checked-in SQL
 migrations, and cover health, faction join idempotency, message validation,
-pagination, cooldown handling, subscription dedupe, SPA fallback, and an
-end-to-end API flow.
+pagination, server frequency limiting, client cooldown contracts,
+subscription dedupe, SPA fallback, and an end-to-end API flow.
