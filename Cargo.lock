@@ -1414,6 +1414,7 @@ dependencies = [
  "chrono",
  "dotenvy",
  "home",
+ "rand",
  "serde",
  "serde_json",
  "sqlx",

@@ -1,4 +1,7 @@
-use crate::{config::ServerConfig, routes::health::health};
+use crate::{
+    config::ServerConfig,
+    routes::{factions, health::health},
+};
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
@@ -40,6 +43,11 @@ pub fn create_app(dependencies: AppDependencies) -> Router {
 
     Router::new()
         .route("/api/health", get(health))
+        .route("/api/factions/counts", get(factions::counts))
+        .route(
+            "/api/factions/{faction}/join",
+            axum::routing::post(factions::join),
+        )
         .fallback(not_found)
         .layer(
             ServiceBuilder::new()
