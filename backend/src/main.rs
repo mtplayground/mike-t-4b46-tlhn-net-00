@@ -1,13 +1,9 @@
-mod app;
-mod config;
-mod db;
-mod models;
-mod routes;
-
-use app::{create_app, AppDependencies};
-use config::ServerConfig;
-use db::create_pg_pool;
 use std::error::Error;
+use tlhn_backend::{
+    app::{create_app, AppDependencies},
+    config::ServerConfig,
+    db::create_pg_pool,
+};
 use tokio::{net::TcpListener, signal};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
