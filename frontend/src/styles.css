@@ -342,30 +342,56 @@
   }
 
   .tlhn-faction-tally {
-    @apply relative z-10 mt-5 rounded-lg border bg-tlhn-void/70 p-4 text-center font-terminal shadow-panel-glitch;
+    @apply relative z-10 mt-0 grid min-h-48 overflow-hidden rounded-xl border bg-tlhn-void/75 p-5 text-left font-terminal shadow-panel-glitch sm:p-6;
+  }
+
+  .tlhn-faction-tally::before {
+    @apply pointer-events-none absolute inset-0 content-[''];
   }
 
   .tlhn-faction-tally-hater {
-    @apply border-hater-500/35;
+    @apply border-hater-500/45 shadow-neon-hater;
+  }
+
+  .tlhn-faction-tally-hater::before {
+    background:
+      radial-gradient(circle at 82% 22%, rgba(255, 48, 72, 0.24), transparent 16rem),
+      linear-gradient(135deg, rgba(255, 48, 72, 0.18), transparent 52%);
   }
 
   .tlhn-faction-tally-lover {
-    @apply border-lover-500/35;
+    @apply border-lover-500/45 shadow-neon-lover;
+  }
+
+  .tlhn-faction-tally-lover::before {
+    background:
+      radial-gradient(circle at 82% 22%, rgba(47, 143, 255, 0.24), transparent 16rem),
+      linear-gradient(135deg, rgba(47, 143, 255, 0.18), transparent 52%);
+  }
+
+  .tlhn-faction-tally-copy {
+    @apply relative z-10 grid gap-2 self-start;
   }
 
   .tlhn-faction-tally-label {
-    @apply block text-xs font-bold uppercase text-tlhn-ash;
+    @apply block text-2xl font-black uppercase leading-none text-tlhn-bone sm:text-3xl;
+  }
+
+  .tlhn-faction-tally-sublabel {
+    @apply block text-xs font-bold uppercase tracking-[0.22em] text-tlhn-ash;
   }
 
   .tlhn-faction-tally-value {
-    @apply mt-2 block text-5xl font-black leading-none sm:text-6xl;
+    @apply relative z-10 mt-6 block self-end text-right text-6xl font-black leading-none sm:text-7xl lg:text-8xl;
     font-variant-numeric: tabular-nums;
   }
 
+  .tlhn-faction-tally-hater .tlhn-faction-tally-label,
   .tlhn-faction-tally-hater .tlhn-faction-tally-value {
     @apply text-hater-500 text-glow-hater;
   }
 
+  .tlhn-faction-tally-lover .tlhn-faction-tally-label,
   .tlhn-faction-tally-lover .tlhn-faction-tally-value {
     @apply text-lover-500 text-glow-lover;
   }
