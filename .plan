@@ -1,18 +1,16 @@
-Architecture plan for Issues #105-#106
+Architecture plan for Issue #109: Enlarge the upper-left TLHN header logo
 
 Current structure:
-- frontend/src/App.tsx contains the React SPA route structure and SiteFooter / NetworkPage component composition.
-- frontend/src/styles.css contains the TLHN visual system, countdown, section spacing, footer/social styling, and utility-line spacing.
-- frontend/public/ contains static assets such as favicon.svg copied by Vite to the production root.
-- backend/ and shared/ are unaffected by these UI-only issues.
+- frontend/src/App.tsx defines the React SPA shell, including AppShell and the upper-left TLHN header wordmark link around lines 104-110.
+- frontend/src/styles.css contains reusable TLHN visual-system classes for the shell, navigation, landing logo, panels, and responsive layout.
+- shared/src/index.ts exports PRODUCT_SHORT_NAME = "TLHN", which the header wordmark already renders.
+- backend/ and database-related files are unaffected; this is a frontend-only presentation change.
 
 Issue dependencies:
-- #105 changes NetworkPage ordering, SiteFooter Discord output, and countdown box sizing.
-- #106 is a smaller spacing follow-up for the Identity / Faction / Transmission utility box and should be applied after or alongside #105 to avoid spacing conflicts.
-- Both issues are frontend-only and do not require database, API, or shared DTO changes.
+- No dependency on other issues. The request is isolated to the small header wordmark and must not alter the large landing-page neon logo styles (.tlhn-neon-logo).
 
 Key design decisions:
-- Keep NetworkPage single-column structure and reorder existing sections rather than introducing new routes or state.
-- Use an inline Discord SVG/icon in SiteFooter beside the existing X link to avoid new package or binary asset dependencies.
-- Adjust countdown and utility spacing through existing CSS classes in styles.css, preserving TLHN dark cyber-terminal branding and responsive behavior.
-- Validate with the frontend/shared TypeScript build and, where possible, the root build if Rust tooling is available.
+- Keep the existing AppShell link, route behavior, terminal font, uppercase styling, hater color, and glow.
+- Increase only the header wordmark text size from text-sm to a responsive size such as text-lg sm:text-xl directly on the existing className in frontend/src/App.tsx.
+- Avoid introducing new assets, dependencies, global CSS, or layout restructuring; the nav/header already supports a larger left-aligned mark.
+- Validate with the existing frontend TypeScript/build tooling after implementation.
