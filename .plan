@@ -1,16 +1,15 @@
-# Architecture plan for Issue #127: Move chat padding from list wrappers into each message card
+# Architecture plan for Issue #129: Put faction tallies above the chat feed in mobile order
 
 ## Module structure, file organization, shared types
-- `frontend/src/styles.css` owns the Tailwind component-layer styles for the chat panel, message list, combined feed, and individual message cards. This issue should be implemented there.
-- `frontend/src/App.tsx` renders the unified feed markup, but no React state, data flow, routing, or accessibility changes are needed for this visual spacing adjustment.
-- `shared/src/*`, `backend/src/*`, and database migrations are out of scope because the issue does not change API contracts, persistence, or message models.
+- `frontend/src/App.tsx` defines the TLHN network page section markup in semantic order: countdown, live faction tallies, unified chat feed, composer, and lower page sections.
+- `frontend/src/styles.css` owns the Tailwind component-layer layout rules, including mobile-only `order` values for `.tlhn-network-layout` children and the desktop reset at `@media (min-width: 640px)`.
+- `shared/src/*`, `backend/src/*`, database migrations, and API types are out of scope because this is a responsive presentation-only change.
 
 ## Dependencies between issues
-- Issue #127 has no blocking dependencies and can be implemented independently.
-- It follows the previous feed-spacing changes from Issues 5.12 / 5.13, changing the spacing strategy from wrapper-side padding to message-card padding.
+- Issue #129 has no blocking dependencies.
+- It adjusts mobile ordering introduced by earlier layout work: countdown remains first, tallies should be second, feed third, composer fourth. Desktop order must continue to reset at `min-width: 640px`.
 
 ## Key design decisions
-- Remove outer horizontal padding around the message list so cards can span the available feed width: set `.tlhn-chat-panel` horizontal padding to `px-0` while preserving vertical spacing, and set `.tlhn-chat-list-combined` to `pr-0`.
-- Add inner padding directly to each `.tlhn-chat-message` (`px-3 py-2`, or `px-4 py-2` if the existing visual rhythm needs more room) so message text and metadata do not sit against the card border.
-- Preserve the existing feed ordering, scroll behavior, faction colors, avatars, timestamps, and TLHN visual language.
-- Validate with the frontend/shared build and, when available, the full workspace build.
+- Implement the fix only in CSS by changing mobile `order` assignments: `.tlhn-network-tallies { order: 2; }` and `.tlhn-network-feed-section { order: 3; }`.
+- Preserve DOM order, React components, ARIA labels, feed state handling, chat scrolling, and desktop layout behavior.
+- Validate with the frontend typecheck/build or the root build to ensure Tailwind class processing still succeeds.
