@@ -174,12 +174,16 @@
     @apply m-0 font-terminal text-3xl font-black uppercase leading-none text-tlhn-bone text-glow-terminal sm:text-4xl;
   }
 
+  .tlhn-network-section-title-compact {
+    @apply text-base leading-tight sm:text-lg;
+  }
+
   .tlhn-network-tally-grid {
     @apply relative z-10 mt-5 grid gap-4 lg:grid-cols-2;
   }
 
   .tlhn-network-feed-section .tlhn-chat-panel {
-    @apply mt-5;
+    @apply mt-0;
   }
 
   .tlhn-network-composer-section .tlhn-message-composer {
@@ -535,26 +539,30 @@
   }
 
   .tlhn-chat-avatar {
-    @apply grid h-8 w-8 place-items-center rounded-full border bg-tlhn-void/80 text-base shadow-panel-glitch;
+    @apply grid h-9 w-9 place-items-center rounded-full border bg-tlhn-void/80 text-base shadow-panel-glitch;
+  }
+
+  .tlhn-chat-avatar svg {
+    @apply h-6 w-6;
   }
 
   .tlhn-chat-avatar-hater {
-    @apply border-hater-500/35 shadow-neon-hater;
+    @apply border-hater-500/55 text-hater-300 shadow-neon-hater;
   }
 
   .tlhn-chat-avatar-lover {
-    @apply border-lover-500/35 shadow-neon-lover;
+    @apply border-lover-500/55 text-lover-300 shadow-neon-lover;
   }
 
   .tlhn-chat-meta strong {
-    @apply min-w-0 truncate text-sm text-tlhn-bone;
+    @apply min-w-0 truncate text-sm;
   }
 
-  .tlhn-chat-name-hater {
+  .tlhn-chat-meta .tlhn-chat-name-hater {
     @apply text-hater-300 text-glow-hater;
   }
 
-  .tlhn-chat-name-lover {
+  .tlhn-chat-meta .tlhn-chat-name-lover {
     @apply text-lover-300 text-glow-lover;
   }
 
