@@ -508,7 +508,7 @@
   }
 
   .tlhn-chat-meta {
-    @apply grid items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto];
+    @apply grid items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto];
   }
 
   .tlhn-chat-avatar {
@@ -539,9 +539,6 @@
     @apply text-lover-300 text-glow-lover;
   }
 
-  .tlhn-chat-faction {
-    @apply text-xs font-bold uppercase text-tlhn-ash;
-  }
 
   .tlhn-chat-meta time {
     @apply text-xs text-tlhn-ash sm:shrink-0;
