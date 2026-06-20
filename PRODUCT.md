@@ -19,9 +19,9 @@ PostgreSQL-backed state in a monorepo.
 - `/network` SPA route with a single-column full-width layout. Desktop/tablet
   order is compact large countdown band, live tally cards, unified feed,
   composer, Identity/Faction/Transmission utility line, subscription row, and
-  site footer. On phones, the unified feed is raised above live tallies so users
-  reach messages sooner. The network page no longer includes a separate TLHN
-  header/action box above the content.
+  site footer. On phones, the mobile order is countdown, live faction tallies,
+  unified feed, then composer. The network page no longer includes a separate
+  TLHN header/action box above the content.
 - Required faction-selection modal on first network entry. Joining assigns a
   generated `prefix_xxxxx` display name, increments faction tallies, sets
   HttpOnly faction/name cookies through the API, and stores the identity in
