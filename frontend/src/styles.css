@@ -269,33 +269,7 @@
   }
 
   .tlhn-subscription-form {
-    @apply relative z-10 grid gap-4 overflow-hidden bg-tlhn-void/70 px-4 py-4 font-terminal shadow-panel-glitch md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:px-28;
-  }
-
-  .tlhn-subscription-form::before,
-  .tlhn-subscription-form::after {
-    @apply pointer-events-none absolute top-1/2 hidden h-8 w-24 -translate-y-1/2 bg-hater-500/80 content-[''] md:block;
-    clip-path: polygon(
-      0 52%,
-      18% 52%,
-      28% 22%,
-      39% 82%,
-      50% 52%,
-      62% 52%,
-      72% 34%,
-      84% 68%,
-      100% 52%
-    );
-    filter: drop-shadow(0 0 10px rgba(255, 48, 72, 0.78));
-  }
-
-  .tlhn-subscription-form::before {
-    @apply left-4;
-  }
-
-  .tlhn-subscription-form::after {
-    @apply right-4;
-    transform: translateY(-50%) scaleX(-1);
+    @apply relative z-10 grid gap-4 overflow-hidden bg-tlhn-void/70 px-4 py-4 font-terminal shadow-panel-glitch md:grid-cols-[auto_minmax(0,1fr)] md:items-center md:px-8 lg:px-10;
   }
 
   .tlhn-subscription-copy {
@@ -340,7 +314,7 @@
   }
 
   .tlhn-faction-tally {
-    @apply relative z-10 mt-0 grid min-h-48 overflow-hidden rounded-xl border bg-tlhn-void/75 p-5 text-left font-terminal shadow-panel-glitch sm:p-6;
+    @apply relative z-10 mt-0 grid min-h-32 overflow-hidden rounded-xl border bg-tlhn-void/75 p-4 text-left font-terminal shadow-panel-glitch sm:p-5;
   }
 
   .tlhn-faction-tally::before {
@@ -372,15 +346,15 @@
   }
 
   .tlhn-faction-tally-label {
-    @apply block text-2xl font-black uppercase leading-none text-tlhn-bone sm:text-3xl;
+    @apply block text-xl font-black uppercase leading-none text-tlhn-bone sm:text-2xl;
   }
 
   .tlhn-faction-tally-sublabel {
-    @apply block text-xs font-bold uppercase tracking-[0.22em] text-tlhn-ash;
+    @apply block text-[0.65rem] font-bold uppercase tracking-[0.18em] text-tlhn-ash;
   }
 
   .tlhn-faction-tally-value {
-    @apply relative z-10 mt-6 block self-end text-right text-6xl font-black leading-none sm:text-7xl lg:text-8xl;
+    @apply relative z-10 mt-4 block self-end text-right text-5xl font-black leading-none sm:text-6xl lg:text-7xl;
     font-variant-numeric: tabular-nums;
   }
 
