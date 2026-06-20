@@ -1,12 +1,12 @@
-use crate::config::ServerConfig;
-use axum::{http::StatusCode, response::IntoResponse, Json, Router};
+use crate::{config::ServerConfig, routes::health::health};
+use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tower::ServiceBuilder;
 use tower_http::{
     compression::CompressionLayer,
-    cors::{AllowOrigin, Any, CorsLayer},
+    cors::{AllowHeaders, AllowMethods, AllowOrigin, CorsLayer},
     trace::TraceLayer,
 };
 
@@ -34,11 +34,12 @@ struct ErrorResponse {
 pub fn create_app(dependencies: AppDependencies) -> Router {
     let cors = CorsLayer::new()
         .allow_origin(AllowOrigin::mirror_request())
-        .allow_methods(Any)
-        .allow_headers(Any)
+        .allow_methods(AllowMethods::mirror_request())
+        .allow_headers(AllowHeaders::mirror_request())
         .allow_credentials(true);
 
     Router::new()
+        .route("/api/health", get(health))
         .fallback(not_found)
         .layer(
             ServiceBuilder::new()
