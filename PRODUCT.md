@@ -10,6 +10,8 @@ PostgreSQL-backed state in a monorepo.
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
+- Site favicon served from `/favicon.svg`: a dark rounded TLHN tile with a red
+  neon mark that matches the product brand.
 - `/network` SPA route with a single-column full-width layout ordered as:
   full-width subscription row, large countdown band, unified feed, composer,
   Identity/Faction/Transmission utility line, live tally cards, and site footer.
