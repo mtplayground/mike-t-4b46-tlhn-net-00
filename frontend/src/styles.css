@@ -431,7 +431,7 @@
   }
 
   .tlhn-chat-panel {
-    @apply relative z-10 mt-7 rounded-lg border bg-tlhn-void/65 p-3 font-terminal shadow-panel-glitch;
+    @apply relative z-10 mt-7 rounded-lg border bg-tlhn-void/65 py-3 pr-3 pl-1 font-terminal shadow-panel-glitch;
   }
 
   .tlhn-chat-panel-hater {
@@ -484,7 +484,7 @@
   }
 
   .tlhn-chat-message {
-    @apply rounded border border-tlhn-bone/10 bg-tlhn-panel/80 p-3;
+    @apply rounded border border-tlhn-bone/10 bg-tlhn-panel/80 p-0;
   }
 
   .tlhn-chat-message-hater {
