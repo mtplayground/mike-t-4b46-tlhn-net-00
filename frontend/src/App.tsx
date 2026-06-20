@@ -807,9 +807,6 @@ function CombinedChatPanel({ refreshToken }: CombinedChatPanelProps) {
                   <strong className={`tlhn-chat-name tlhn-chat-name-${accent}`}>
                     {message.display_name}
                   </strong>
-                  <span className="tlhn-chat-faction">
-                    {FACTION_DISPLAY_NAMES[message.faction]}
-                  </span>
                   <time dateTime={message.created_at}>
                     {formatRelativeTime(message.created_at, now)}
                   </time>
