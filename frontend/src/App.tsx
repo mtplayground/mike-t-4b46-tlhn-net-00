@@ -276,13 +276,29 @@ function NetworkPage() {
   return (
     <>
       <section className="tlhn-network-layout" aria-label="TLHN network">
-        <section
-          className="tlhn-network-section tlhn-network-subscription-section"
-          aria-label="Network subscription"
-        >
-          <EmailSubscriptionForm />
-        </section>
         <CountdownTimer />
+        <section
+          className="tlhn-network-section tlhn-network-tallies"
+          aria-labelledby="network-tallies-title"
+        >
+          <div className="tlhn-network-section-heading">
+            <p id="network-tallies-title" className="tlhn-network-kicker">
+              Live faction tallies
+            </p>
+          </div>
+          <div className="tlhn-network-tally-grid">
+            <FactionTallyDisplay
+              accent="hater"
+              count={factionCounts.ai_haters}
+              faction="ai_haters"
+            />
+            <FactionTallyDisplay
+              accent="lover"
+              count={factionCounts.ai_lovers}
+              faction="ai_lovers"
+            />
+          </div>
+        </section>
         <section
           className="tlhn-network-section tlhn-network-feed-section"
           id="network-join"
@@ -337,26 +353,10 @@ function NetworkPage() {
           </div>
         </section>
         <section
-          className="tlhn-network-section tlhn-network-tallies"
-          aria-labelledby="network-tallies-title"
+          className="tlhn-network-section tlhn-network-subscription-section"
+          aria-label="Network subscription"
         >
-          <div className="tlhn-network-section-heading">
-            <p id="network-tallies-title" className="tlhn-network-kicker">
-              Live faction tallies
-            </p>
-          </div>
-          <div className="tlhn-network-tally-grid">
-            <FactionTallyDisplay
-              accent="hater"
-              count={factionCounts.ai_haters}
-              faction="ai_haters"
-            />
-            <FactionTallyDisplay
-              accent="lover"
-              count={factionCounts.ai_lovers}
-              faction="ai_lovers"
-            />
-          </div>
+          <EmailSubscriptionForm />
         </section>
         <SiteFooter />
       </section>
@@ -578,8 +578,18 @@ function SiteFooter() {
         <a href="#network-about" aria-label="TLHN on X">
           𝕏
         </a>
-        <a href="#network-about" aria-label="TLHN on Discord">
-          ◈
+        <a
+          href="https://discord.gg/tlhn"
+          aria-label="TLHN on Discord"
+          rel="noreferrer"
+          target="_blank"
+        >
+          <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+            <path
+              d="M19.54 5.24A16.9 16.9 0 0 0 15.35 4l-.2.38c1.48.36 2.17.88 2.17.88a12.5 12.5 0 0 0-6.63-1.03 13.6 13.6 0 0 0-4.01 1.03s.72-.55 2.3-.91L8.82 4a16.9 16.9 0 0 0-4.36 1.24S2.2 8.52 1.82 14.98c2.28 2.67 5.73 2.77 5.73 2.77l.72-.98a4.57 4.57 0 0 1-2.51-1.68l.4.24c.02.02.04.03.07.05.05.03.1.05.15.08.61.34 1.22.61 1.79.81 1.02.36 2.24.69 3.68.69s2.66-.33 3.68-.69a9.83 9.83 0 0 0 2.35-1.18 4.64 4.64 0 0 1-2.6 1.7l.71.96s3.46-.1 5.74-2.77c-.38-6.46-2.19-9.74-2.19-9.74ZM8.9 13.99c-.9 0-1.64-.82-1.64-1.83 0-1 .72-1.82 1.64-1.82.93 0 1.67.82 1.65 1.82 0 1.01-.72 1.83-1.65 1.83Zm6.2 0c-.9 0-1.64-.82-1.64-1.83 0-1 .72-1.82 1.64-1.82.93 0 1.65.82 1.65 1.82 0 1.01-.72 1.83-1.65 1.83Z"
+              fill="currentColor"
+            />
+          </svg>
         </a>
       </div>
     </footer>

@@ -239,7 +239,7 @@
   }
 
   .tlhn-countdown-value {
-    @apply relative grid min-h-28 min-w-0 place-items-center overflow-visible whitespace-nowrap rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-3 text-4xl font-black leading-none text-hater-100 shadow-neon-hater sm:min-h-36 sm:text-5xl lg:min-h-40;
+    @apply relative grid min-h-20 min-w-0 place-items-center overflow-visible whitespace-nowrap rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-3 text-4xl font-black leading-none text-hater-100 shadow-neon-hater sm:min-h-28 sm:text-5xl lg:min-h-32;
     font-variant-numeric: tabular-nums;
   }
 
@@ -759,6 +759,10 @@
 
   .tlhn-site-footer-social a {
     @apply grid h-8 w-8 place-items-center rounded-full border border-tlhn-bone/15 bg-tlhn-panel/80 text-sm font-black text-tlhn-bone shadow-panel-glitch hover:border-hater-500 hover:text-hater-300;
+  }
+
+  .tlhn-site-footer-social svg {
+    @apply h-4 w-4;
   }
 
   .tlhn-faction-modal-backdrop {
