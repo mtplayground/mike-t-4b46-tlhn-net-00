@@ -20,6 +20,44 @@ pub enum Faction {
     AiLovers,
 }
 
+impl Faction {
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "ai_haters" => Some(Self::AiHaters),
+            "ai_lovers" => Some(Self::AiLovers),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::AiHaters => "ai_haters",
+            Self::AiLovers => "ai_lovers",
+        }
+    }
+
+    pub fn display_name_prefixes(self) -> &'static [&'static str] {
+        match self {
+            Self::AiHaters => &[
+                "luddite",
+                "cassandra",
+                "sentinel",
+                "icarus",
+                "sisyphus",
+                "diogenes",
+            ],
+            Self::AiLovers => &[
+                "prometheus",
+                "daedalus",
+                "oracle",
+                "tesla",
+                "nova",
+                "cypher",
+            ],
+        }
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MessageRow {
