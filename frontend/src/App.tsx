@@ -284,28 +284,6 @@ function NetworkPage() {
         </section>
         <CountdownTimer />
         <section
-          className="tlhn-network-section tlhn-network-tallies"
-          aria-labelledby="network-tallies-title"
-        >
-          <div className="tlhn-network-section-heading">
-            <p id="network-tallies-title" className="tlhn-network-kicker">
-              Live faction tallies
-            </p>
-          </div>
-          <div className="tlhn-network-tally-grid">
-            <FactionTallyDisplay
-              accent="hater"
-              count={factionCounts.ai_haters}
-              faction="ai_haters"
-            />
-            <FactionTallyDisplay
-              accent="lover"
-              count={factionCounts.ai_lovers}
-              faction="ai_lovers"
-            />
-          </div>
-        </section>
-        <section
           className="tlhn-network-section tlhn-network-feed-section"
           id="network-join"
           aria-label="Network transmissions"
@@ -355,6 +333,28 @@ function NetworkPage() {
             <UtilityLine
               label="Transmission"
               value={identity ? "Live channel" : "Awaiting faction"}
+            />
+          </div>
+        </section>
+        <section
+          className="tlhn-network-section tlhn-network-tallies"
+          aria-labelledby="network-tallies-title"
+        >
+          <div className="tlhn-network-section-heading">
+            <p id="network-tallies-title" className="tlhn-network-kicker">
+              Live faction tallies
+            </p>
+          </div>
+          <div className="tlhn-network-tally-grid">
+            <FactionTallyDisplay
+              accent="hater"
+              count={factionCounts.ai_haters}
+              faction="ai_haters"
+            />
+            <FactionTallyDisplay
+              accent="lover"
+              count={factionCounts.ai_lovers}
+              faction="ai_lovers"
             />
           </div>
         </section>
