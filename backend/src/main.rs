@@ -1,6 +1,8 @@
 mod app;
 mod config;
 mod db;
+mod models;
+mod routes;
 
 use app::{create_app, AppDependencies};
 use config::ServerConfig;
@@ -15,7 +17,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     init_tracing();
 
     let config = ServerConfig::from_env()?;
-    let db_pool = create_pg_pool(&config).await?;
+    let db_pool = create_pg_pool(&config)?;
     let listener = TcpListener::bind((config.host.as_str(), config.port)).await?;
     let local_addr = listener.local_addr()?;
     let app = create_app(AppDependencies::new(config.clone(), db_pool));
