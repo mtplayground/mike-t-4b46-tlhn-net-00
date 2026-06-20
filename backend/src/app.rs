@@ -1,6 +1,6 @@
 use crate::{
     config::ServerConfig,
-    routes::{factions, health::health, messages},
+    routes::{factions, health::health, messages, subscriptions},
 };
 use axum::{http::StatusCode, response::IntoResponse, routing::get, Json, Router};
 use serde::Serialize;
@@ -49,6 +49,10 @@ pub fn create_app(dependencies: AppDependencies) -> Router {
         .route("/api/health", get(health))
         .route("/api/factions/counts", get(factions::counts))
         .route("/api/messages", get(messages::list).post(messages::create))
+        .route(
+            "/api/subscriptions",
+            axum::routing::post(subscriptions::create),
+        )
         .route(
             "/api/factions/{faction}/join",
             axum::routing::post(factions::join),
