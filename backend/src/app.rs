@@ -123,10 +123,15 @@ async fn add_security_headers(mut response: Response) -> Response {
 
 fn frontend_dist_path() -> PathBuf {
     let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    let repo_root_candidate = current_dir.join("frontend/dist");
-    if repo_root_candidate.exists() {
-        return repo_root_candidate;
+    for candidate in [
+        current_dir.join("frontend/dist"),
+        current_dir.join("../frontend/dist"),
+        PathBuf::from("/opt/app/frontend/dist"),
+    ] {
+        if candidate.exists() {
+            return candidate;
+        }
     }
 
-    current_dir.join("../frontend/dist")
+    current_dir.join("frontend/dist")
 }
