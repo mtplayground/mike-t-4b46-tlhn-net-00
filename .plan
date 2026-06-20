@@ -1,16 +1,17 @@
-Architecture plan for Issue #109: Enlarge the upper-left TLHN header logo
+Architecture plan for Issues #111-#112
 
 Current structure:
-- frontend/src/App.tsx defines the React SPA shell, including AppShell and the upper-left TLHN header wordmark link around lines 104-110.
-- frontend/src/styles.css contains reusable TLHN visual-system classes for the shell, navigation, landing logo, panels, and responsive layout.
-- shared/src/index.ts exports PRODUCT_SHORT_NAME = "TLHN", which the header wordmark already renders.
-- backend/ and database-related files are unaffected; this is a frontend-only presentation change.
+- backend/src/routes/messages.rs owns message validation, client-key detection, in-memory rate limiting, database insert/list handlers, and message route unit tests.
+- shared/src/messages.ts defines the cross-package message DTOs and Zod schemas consumed by the frontend and backend contract expectations.
+- frontend/src/App.tsx contains MessageComposer, cooldown state, post-submit handling, and display of backend retry metadata.
+- backend/tests/api.rs contains integration coverage for message posting, cooldown/rate-limit behavior, and end-to-end API flows.
 
 Issue dependencies:
-- No dependency on other issues. The request is isolated to the small header wordmark and must not alter the large landing-page neon logo styles (.tlhn-neon-logo).
+- #111 must be implemented first: replace the backend 30-second per-client cooldown with a sliding one-second frequency limiter that allows two posts per client key and rejects the third with 429 plus Retry-After/retry_after_ms metadata; reserved limiter entries must be released if DB insert fails.
+- #112 depends on #111: preserve the client-side 30-second cooldown after successful posts, but treat the new backend 429 as a short frequency-limit warning rather than starting or extending the 30-second UI cooldown.
 
 Key design decisions:
-- Keep the existing AppShell link, route behavior, terminal font, uppercase styling, hater color, and glow.
-- Increase only the header wordmark text size from text-sm to a responsive size such as text-lg sm:text-xl directly on the existing className in frontend/src/App.tsx.
-- Avoid introducing new assets, dependencies, global CSS, or layout restructuring; the nav/header already supports a larger left-aligned mark.
-- Validate with the existing frontend TypeScript/build tooling after implementation.
+- Keep persistence in the existing PostgreSQL/sqlx message tables; no schema change is expected for a frequency limiter because it is transient request state.
+- Model backend 429 response metadata explicitly in shared/src/messages.ts so frontend logic can distinguish server frequency limiting from successful local cooldown behavior.
+- Update backend unit/integration tests around the new 2-msg/sec policy, Retry-After: 1 header, retry_after_ms payload, and DB-failure reservation release path.
+- Update frontend tests/build expectations through existing TypeScript contracts; avoid changing unrelated TLHN layout, branding, routes, auth, storage, or database features.
