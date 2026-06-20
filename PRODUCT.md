@@ -11,27 +11,31 @@ PostgreSQL-backed state in a monorepo.
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
 - `/network` SPA route with a single-column full-width layout: top TLHN header
-  with `ABOUT TLHN` and `JOIN THE NETWORK` actions, countdown band, live tally
-  cards, unified feed, composer, subscription row, utility/footer rows.
+  with `ABOUT TLHN` and `JOIN THE NETWORK` actions, full-width subscription
+  row, large countdown band, live tally cards, unified feed, composer, and
+  utility/footer rows.
 - Required faction-selection modal on first network entry. Joining assigns a
   generated `prefix_xxxxx` display name, increments faction tallies, sets
   HttpOnly faction/name cookies through the API, and stores the identity in
   browser localStorage for the session experience.
 - Unified scrollable faction feed polls `/api/messages` without a faction
-  filter, renders both factions in one time-ordered list, colors display names
-  by faction, and shows faction avatars without comment/like icons.
+  filter, renders both factions in one time-ordered list without extra feed
+  headings, colors display names by faction, and uses red broken-fist and blue
+  circuit-heart faction logos instead of generic avatars.
 - Chat feed initially loads the latest 25 messages, renders oldest-to-newest so
-  the newest message sits at the bottom, and supports scroll-up infinite history
-  loading via `before_id` while preserving scroll position.
+  the newest message sits at the bottom, supports scroll-up infinite history
+  loading via `before_id` while preserving scroll position, and formats relative
+  timestamps as minutes, hours/minutes, or days/hours.
 - Message composer posts as the selected faction/name, enforces a 30-second
   cooldown in the UI, and handles backend 429 responses with retry metadata.
 - Live faction tally cards poll `/api/factions/counts` and render AI Haters in
   red with `HUMANS FIGHTING BACK`, AI Lovers in blue with `EMBRACING THE FUTURE`,
   and large neon numerals.
-- Flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
+- Large flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
   2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment.
-- Full-width neon subscription row posts to `/api/subscriptions`, validates
-  client-side, and shows success, duplicate, and error states.
+- Full-width neon `KEEP YOUR HUMANITY UPDATES` subscription row sits above the
+  countdown, posts to `/api/subscriptions`, validates client-side, and shows
+  success, duplicate, and error states.
 - Bottom footer shows `© 2025 TLHN. All rights reserved.`, Manifesto/Privacy/
   Terms/Contact links, and X/Discord icons.
 
