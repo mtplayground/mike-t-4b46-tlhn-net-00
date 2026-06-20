@@ -116,14 +116,12 @@
     @apply flex w-full flex-col gap-4;
   }
 
-  .tlhn-network-top-header,
   .tlhn-network-section,
   .tlhn-network-footer-row,
   .tlhn-faction-feed-panel {
     @apply relative w-full rounded-lg border bg-tlhn-panel/85 p-5 shadow-panel-glitch backdrop-blur-sm sm:p-6;
   }
 
-  .tlhn-network-top-header::before,
   .tlhn-network-section::before,
   .tlhn-network-footer-row::before,
   .tlhn-faction-feed-panel::before {
@@ -136,30 +134,6 @@
       ),
       linear-gradient(180deg, rgba(242, 245, 248, 0.05), transparent 40%);
     mix-blend-mode: screen;
-  }
-
-  .tlhn-network-top-header {
-    @apply grid gap-5 border-hater-500/25 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start;
-  }
-
-  .tlhn-network-header-copy {
-    @apply relative z-10 m-0 mt-4 max-w-3xl text-sm leading-6 text-tlhn-bone/75 sm:text-base;
-  }
-
-  .tlhn-network-actions {
-    @apply relative z-10 flex flex-wrap items-center gap-3 lg:justify-end;
-  }
-
-  .tlhn-network-action {
-    @apply inline-flex min-h-11 items-center justify-center rounded border border-tlhn-bone/20 bg-tlhn-void/70 px-4 font-terminal text-xs font-bold uppercase text-tlhn-bone no-underline shadow-panel-glitch transition duration-150 hover:border-lover-500/60 hover:bg-lover-500/10 focus:outline-none focus:ring-2 focus:ring-lover-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
-  }
-
-  .tlhn-network-action-primary {
-    @apply border-hater-500/70 bg-hater-500/10 shadow-neon-hater hover:border-hater-500 hover:bg-hater-500/20 focus:ring-hater-500;
-  }
-
-  .tlhn-network-header-status {
-    @apply relative z-10 m-0 rounded border border-tlhn-bone/10 bg-tlhn-void/70 px-3 py-2 font-terminal text-xs uppercase text-tlhn-ash lg:col-span-2;
   }
 
   .tlhn-network-section {
@@ -222,17 +196,12 @@
     @apply relative z-10 m-0 font-terminal text-sm font-bold uppercase text-tlhn-ash;
   }
 
-  .tlhn-faction-title,
-  .tlhn-network-title {
+  .tlhn-faction-title {
     @apply relative z-10 m-0 mt-3 font-terminal font-black uppercase leading-none text-tlhn-bone text-glow-terminal;
   }
 
   .tlhn-faction-title {
     @apply text-4xl sm:text-5xl;
-  }
-
-  .tlhn-network-title {
-    @apply mt-0 text-4xl sm:text-5xl lg:text-center;
   }
 
   .tlhn-network-notice {
