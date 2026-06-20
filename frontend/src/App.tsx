@@ -283,10 +283,9 @@ function NetworkPage() {
           aria-labelledby="network-tallies-title"
         >
           <div className="tlhn-network-section-heading">
-            <p className="tlhn-network-kicker">Live faction tallies</p>
-            <h2 id="network-tallies-title" className="tlhn-network-section-title">
-              The split signal
-            </h2>
+            <p id="network-tallies-title" className="tlhn-network-kicker">
+              Live faction tallies
+            </p>
           </div>
           <div className="tlhn-network-tally-grid">
             <FactionTallyDisplay
@@ -1245,7 +1244,6 @@ function NetworkTopHeader({ identity }: NetworkTopHeaderProps) {
   return (
     <header className="tlhn-network-top-header">
       <div>
-        <p className="tlhn-network-kicker">Human signal active</p>
         <h1 id="network-title" className="tlhn-network-title">
           {PRODUCT_SHORT_NAME}
         </h1>
