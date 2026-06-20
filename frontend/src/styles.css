@@ -244,16 +244,16 @@
   }
 
   .tlhn-countdown {
-    @apply relative z-10 mt-0 rounded-lg border border-hater-500/25 bg-tlhn-void/70 p-3 font-terminal shadow-panel-glitch sm:p-4;
+    @apply relative z-10 mt-0 rounded-lg border border-hater-500/25 bg-tlhn-void/70 p-5 font-terminal shadow-panel-glitch sm:p-6;
     grid-column: 1 / -1;
   }
 
   .tlhn-countdown-label {
-    @apply m-0 text-center text-xs font-bold uppercase text-tlhn-ash;
+    @apply m-0 text-center text-sm font-bold uppercase text-tlhn-ash;
   }
 
   .tlhn-countdown-grid {
-    @apply mt-3 grid gap-2;
+    @apply mt-4 grid gap-3;
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
@@ -270,7 +270,7 @@
   }
 
   .tlhn-countdown-value {
-    @apply relative grid min-h-14 min-w-0 place-items-center overflow-visible whitespace-nowrap rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-2 text-2xl font-black leading-none text-hater-100 shadow-neon-hater sm:text-3xl;
+    @apply relative grid min-h-28 min-w-0 place-items-center overflow-visible whitespace-nowrap rounded border border-tlhn-bone/10 bg-tlhn-panel/95 px-3 text-4xl font-black leading-none text-hater-100 shadow-neon-hater sm:min-h-36 sm:text-5xl lg:min-h-40;
     font-variant-numeric: tabular-nums;
   }
 
@@ -333,12 +333,8 @@
     @apply relative z-10 text-left uppercase;
   }
 
-  .tlhn-subscription-copy p {
-    @apply m-0 text-xs font-bold tracking-[0.24em] text-tlhn-ash;
-  }
-
   .tlhn-subscription-copy h2 {
-    @apply m-0 mt-1 text-2xl font-black leading-none text-hater-500 text-glow-hater;
+    @apply m-0 text-2xl font-black leading-none text-hater-500 text-glow-hater;
   }
 
   .tlhn-subscription-row {

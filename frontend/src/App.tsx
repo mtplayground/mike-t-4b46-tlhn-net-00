@@ -277,6 +277,12 @@ function NetworkPage() {
     <>
       <section className="tlhn-network-layout" aria-labelledby="network-title">
         <NetworkTopHeader identity={identity} />
+        <section
+          className="tlhn-network-section tlhn-network-subscription-section"
+          aria-label="Network subscription"
+        >
+          <EmailSubscriptionForm />
+        </section>
         <CountdownTimer />
         <section
           className="tlhn-network-section tlhn-network-tallies"
@@ -331,12 +337,6 @@ function NetworkPage() {
               &gt;_ Choose a faction to unlock the transmission channel.
             </p>
           )}
-        </section>
-        <section
-          className="tlhn-network-section tlhn-network-subscription-section"
-          aria-label="Network subscription"
-        >
-          <EmailSubscriptionForm />
         </section>
         <section
           className="tlhn-network-footer-row"
@@ -525,8 +525,7 @@ function EmailSubscriptionForm() {
   return (
     <form className="tlhn-subscription-form" onSubmit={submitSubscription}>
       <div className="tlhn-subscription-copy">
-        <p>KEEP YOUR HUMANITY</p>
-        <h2>KEEP UPDATES</h2>
+        <h2>KEEP YOUR HUMANITY UPDATES</h2>
       </div>
       <div className="tlhn-subscription-row">
         <input
