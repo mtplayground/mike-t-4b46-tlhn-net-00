@@ -579,11 +579,11 @@
   }
 
   .tlhn-utility-stack {
-    @apply relative z-10 mt-8 grid gap-4;
+    @apply relative z-10 mt-8 grid gap-4 md:grid-cols-3;
   }
 
   .tlhn-utility-line {
-    @apply grid gap-1 border-t border-tlhn-bone/10 pt-4 font-terminal;
+    @apply grid min-w-0 gap-1 border-t border-tlhn-bone/10 pt-4 font-terminal;
   }
 
   .tlhn-utility-line span {
