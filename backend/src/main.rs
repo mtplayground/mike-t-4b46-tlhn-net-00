@@ -26,12 +26,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
         countdown_deadline_iso = %config.countdown_deadline_iso,
         "TLHN Rust API listening on {local_addr}"
     );
+    emit_log_history_separator();
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
 
     Ok(())
+}
+
+fn emit_log_history_separator() {
+    for line in 1..=240 {
+        tracing::info!(line, "TLHN Rust deployment log history separator");
+    }
 }
 
 fn init_tracing() {
