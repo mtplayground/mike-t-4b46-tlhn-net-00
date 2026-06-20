@@ -31,8 +31,9 @@ PostgreSQL-backed state in a monorepo.
   headings, colors display names by faction, and uses red broken-fist and blue
   circuit-heart faction logos instead of generic avatars. Individual messages do
   not repeat the `AI Haters` / `AI Lovers` faction label as visible text. The
-  feed is visually tight: the chat feed wrappers use reduced left and right
-  padding, and each message card has no inner padding.
+  feed is visually tight: the message-list wrappers have no horizontal
+  padding, while each message card owns its inner padding so text and metadata
+  have breathing room inside the border.
 - Chat feed initially loads the latest 25 messages, renders oldest-to-newest so
   the newest message sits at the bottom, supports scroll-up infinite history
   loading via `before_id` while preserving scroll position, and formats relative
