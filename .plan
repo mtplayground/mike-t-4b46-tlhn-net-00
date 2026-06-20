@@ -1,21 +1,18 @@
-Architecture plan for Issue #103: Add a site favicon
+Architecture plan for Issues #105-#106
 
 Current structure:
-- frontend/: Vite React SPA with index.html as the HTML shell and src/ for app code/styles.
-- frontend/public/: Vite static assets copied verbatim to the production site root.
-- backend/: Rust Axum server that serves /api routes plus the built frontend/dist static assets.
-- shared/: TypeScript DTO/constants package shared by frontend code.
+- frontend/src/App.tsx contains the React SPA route structure and SiteFooter / NetworkPage component composition.
+- frontend/src/styles.css contains the TLHN visual system, countdown, section spacing, footer/social styling, and utility-line spacing.
+- frontend/public/ contains static assets such as favicon.svg copied by Vite to the production root.
+- backend/ and shared/ are unaffected by these UI-only issues.
 
-Issue dependency plan:
-- Issue #103 is independent. It only touches the frontend static asset pipeline.
-- No backend, database, API, or shared DTO changes are required.
+Issue dependencies:
+- #105 changes NetworkPage ordering, SiteFooter Discord output, and countdown box sizing.
+- #106 is a smaller spacing follow-up for the Identity / Faction / Transmission utility box and should be applied after or alongside #105 to avoid spacing conflicts.
+- Both issues are frontend-only and do not require database, API, or shared DTO changes.
 
-Design decisions:
-- Add the favicon as frontend/public/favicon.svg so Vite copies it to /favicon.svg during build.
-- Reference it in frontend/index.html with <link rel="icon" type="image/svg+xml" href="/favicon.svg" />.
-- Match TLHN branding from PRODUCT.md: dark cyber/glitch aesthetic, red neon TLHN mark, compact rounded tile.
-- Keep the SVG static and self-contained; no runtime dependencies or generated assets.
-
-Validation:
-- Run npm run build to confirm Vite includes the public asset path and HTML remains valid.
-- Optionally curl /favicon.svg after deploy to confirm static serving through the Rust backend.
+Key design decisions:
+- Keep NetworkPage single-column structure and reorder existing sections rather than introducing new routes or state.
+- Use an inline Discord SVG/icon in SiteFooter beside the existing X link to avoid new package or binary asset dependencies.
+- Adjust countdown and utility spacing through existing CSS classes in styles.css, preserving TLHN dark cyber-terminal branding and responsive behavior.
+- Validate with the frontend/shared TypeScript build and, where possible, the root build if Rust tooling is available.
