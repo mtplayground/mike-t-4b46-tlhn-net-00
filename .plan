@@ -1,16 +1,16 @@
-# Architecture plan for Issue #123: Remove the per-message faction label from chat messages
+# Architecture plan for Issue #125: Reduce right-side padding of the chat message area
 
-## Project/module structure
-- `frontend/src/App.tsx` renders the unified chat feed. The per-message faction label is currently a `<span className="tlhn-chat-faction">` inside each message's metadata row.
-- `frontend/src/styles.css` contains the matching `.tlhn-chat-faction` style rule. That rule should be deleted once the markup is removed.
-- `shared/src/*`, `backend/src/*`, database migrations, and API models remain unchanged because message payloads still include faction data for avatar/name coloring and accessibility.
+## Module structure, file organization, shared types
+- `frontend/src/styles.css` owns the Tailwind component-layer styles for the chat panel, message list, and combined feed spacing. This is the expected implementation surface.
+- `frontend/src/App.tsx` renders the unified chat feed and message cards, but no markup, state, polling, history-loading, or accessibility changes are required.
+- `shared/src/*`, `backend/src/*`, and database migrations remain out of scope because this is a CSS-only layout adjustment.
 
-## Issue dependencies and sequencing
-- Issue #123 has no blocking dependencies.
-- The implementation should be isolated to the unified chat feed UI and its unused CSS cleanup.
+## Dependencies between issues
+- Issue #125 has no direct implementation dependency and can be applied independently.
+- It pairs with earlier left-padding work from Issue 5.12, so the new right-side values should keep the feed visually balanced with the already-reduced left padding.
 
 ## Key design decisions
-- Remove only the visible per-message faction text (`AI Haters` / `AI Lovers`) from chat message metadata.
-- Preserve faction-colored display names, faction avatars, and the avatar `aria-label` exactly as requested.
-- Keep message fetching, posting, ordering, history loading, timestamps, and shared faction types unchanged.
-- Validate with the existing frontend/typecheck/build workflow after implementation.
+- Reduce right-side wrapper spacing so message cards can use more horizontal width: `.tlhn-chat-panel` `pr-3` to `pr-1`, remove `.tlhn-chat-list` `pr-1`, and reduce `.tlhn-chat-list-combined` `pr-2` to `pr-1`.
+- Keep `.tlhn-chat-message` itself at `p-0`; remaining horizontal whitespace is coming from wrappers rather than the message item.
+- Preserve existing TLHN styling, borders, scroll behavior, message ordering, avatars, display names, and timestamps.
+- Validate with the frontend build or lint/typecheck command after implementation.
