@@ -11,7 +11,7 @@
     "dev": "concurrently -n shared,backend,frontend -c cyan,green,magenta \"npm run dev -w @tlhn/shared\" \"cargo run --manifest-path backend/Cargo.toml\" \"npm run dev -w @tlhn/frontend\"",
     "build": "npm run build -w @tlhn/shared && cargo build --manifest-path backend/Cargo.toml && npm run build -w @tlhn/frontend",
     "db:migrate": "psql \"$DATABASE_URL\" -v ON_ERROR_STOP=1 -f backend/drizzle/0000_baseline.sql -f backend/drizzle/0001_create_core_tables.sql",
-    "start": "target/debug/tlhn-backend",
+    "start": "target/release/tlhn-backend",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
