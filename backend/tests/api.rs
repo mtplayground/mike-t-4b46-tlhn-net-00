@@ -1,0 +1,506 @@
+use axum::{
+    body::{to_bytes, Body},
+    http::{header, Method, Request, StatusCode},
+    Router,
+};
+use serde_json::{json, Value};
+use sqlx::postgres::PgPoolOptions;
+use std::{
+    fs,
+    net::TcpListener,
+    path::PathBuf,
+    process::Command,
+    sync::{Arc, Mutex},
+    time::{SystemTime, UNIX_EPOCH},
+};
+use tlhn_backend::{
+    app::{create_app, AppDependencies},
+    config::ServerConfig,
+    routes::messages::MessagePostRateLimiter,
+};
+use tower::ServiceExt;
+
+const POSTGRES_BIN: &str = "/usr/lib/postgresql/16/bin";
+
+#[tokio::test(flavor = "multi_thread")]
+async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
+) -> Result<(), Box<dyn std::error::Error>> {
+    let postgres = TestPostgres::start()?;
+    postgres.apply_migrations()?;
+    let mut app = build_app(&postgres.database_url()).await?;
+
+    let health = request_json(&mut app, Method::GET, "/api/health", None, &[]).await?;
+    assert_eq!(health.status, StatusCode::OK);
+    assert_eq!(health.json["status"], "ok");
+    assert_eq!(health.json["product"], "The Last Human Network");
+    assert_eq!(health.json["database"]["status"], "ok");
+
+    let initial_counts =
+        request_json(&mut app, Method::GET, "/api/factions/counts", None, &[]).await?;
+    assert_eq!(initial_counts.status, StatusCode::OK);
+    assert_eq!(
+        initial_counts.json["counts"],
+        json!({"ai_haters": 0, "ai_lovers": 0})
+    );
+
+    let join = request_json(
+        &mut app,
+        Method::POST,
+        "/api/factions/ai_haters/join",
+        None,
+        &[],
+    )
+    .await?;
+    assert_eq!(join.status, StatusCode::OK);
+    assert_eq!(join.json["joined"], true);
+    assert_eq!(join.json["already_joined"], false);
+    assert_eq!(join.json["faction"], "ai_haters");
+    assert_eq!(join.json["counts"], json!({"ai_haters": 1, "ai_lovers": 0}));
+    let display_name = join.json["display_name"]
+        .as_str()
+        .ok_or("missing display name")?
+        .to_owned();
+    assert!(is_generated_display_name(&display_name));
+    let cookie_header = cookie_header(&join)?;
+
+    let repeated_join = request_json(
+        &mut app,
+        Method::POST,
+        "/api/factions/ai_lovers/join",
+        None,
+        &[(header::COOKIE.as_str(), cookie_header.as_str())],
+    )
+    .await?;
+    assert_eq!(repeated_join.status, StatusCode::OK);
+    assert_eq!(repeated_join.json["already_joined"], true);
+    assert_eq!(repeated_join.json["faction"], "ai_haters");
+    assert_eq!(
+        repeated_join.json["counts"],
+        json!({"ai_haters": 1, "ai_lovers": 0})
+    );
+
+    let invalid_message = request_json(
+        &mut app,
+        Method::POST,
+        "/api/messages",
+        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":""})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(invalid_message.status, StatusCode::BAD_REQUEST);
+    assert_eq!(invalid_message.json["error"], "Invalid message payload");
+
+    let message_payload = json!({
+        "faction": "ai_haters",
+        "display_name": display_name,
+        "body": "End-to-end human signal."
+    });
+    let created_message = request_json(
+        &mut app,
+        Method::POST,
+        "/api/messages",
+        Some(message_payload.clone()),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            ("x-forwarded-for", "192.0.2.24"),
+        ],
+    )
+    .await?;
+    assert_eq!(created_message.status, StatusCode::CREATED);
+    assert_eq!(
+        created_message.json["message"]["body"],
+        "End-to-end human signal."
+    );
+    assert_eq!(created_message.json["message"]["user"], Value::Null);
+
+    let cooldown = request_json(
+        &mut app,
+        Method::POST,
+        "/api/messages",
+        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Too soon."})),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            ("x-forwarded-for", "192.0.2.24"),
+        ],
+    )
+    .await?;
+    assert_eq!(cooldown.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        cooldown
+            .headers
+            .get(header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok()),
+        Some("30")
+    );
+    assert_eq!(cooldown.json["error"], "Message post cooldown active");
+
+    for index in 1..=28 {
+        insert_message(
+            postgres.database_url().as_str(),
+            "ai_haters",
+            "sentinel_pg001",
+            format!("Paged signal {index}").as_str(),
+        )
+        .await?;
+    }
+    for index in 1..=3 {
+        insert_message(
+            postgres.database_url().as_str(),
+            "ai_lovers",
+            "oracle_cd456",
+            format!("Blue signal {index}").as_str(),
+        )
+        .await?;
+    }
+
+    let first_page = request_json(
+        &mut app,
+        Method::GET,
+        "/api/messages?faction=ai_haters&limit=25",
+        None,
+        &[],
+    )
+    .await?;
+    assert_eq!(first_page.status, StatusCode::OK);
+    assert_eq!(first_page.json["has_more"], true);
+    let messages = first_page.json["messages"]
+        .as_array()
+        .ok_or("messages should be an array")?;
+    assert_eq!(messages.len(), 25);
+    assert_eq!(messages[0]["body"], "Paged signal 28");
+    assert_eq!(messages[24]["body"], "Paged signal 4");
+    let before_id = messages[24]["id"].as_i64().ok_or("missing before id")?;
+
+    let second_page_uri = format!("/api/messages?faction=ai_haters&limit=25&before_id={before_id}");
+    let second_page = request_json(&mut app, Method::GET, &second_page_uri, None, &[]).await?;
+    assert_eq!(second_page.status, StatusCode::OK);
+    assert_eq!(second_page.json["has_more"], false);
+    let second_messages = second_page.json["messages"]
+        .as_array()
+        .ok_or("messages should be an array")?;
+    assert_eq!(
+        second_messages
+            .iter()
+            .map(|message| message["body"].as_str().unwrap_or_default())
+            .collect::<Vec<_>>(),
+        vec![
+            "Paged signal 3",
+            "Paged signal 2",
+            "Paged signal 1",
+            "End-to-end human signal."
+        ]
+    );
+
+    let invalid_subscription = request_json(
+        &mut app,
+        Method::POST,
+        "/api/subscriptions",
+        Some(json!({"email":"not-an-email"})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(invalid_subscription.status, StatusCode::BAD_REQUEST);
+
+    let first_subscription = request_json(
+        &mut app,
+        Method::POST,
+        "/api/subscriptions",
+        Some(json!({"email":"Flow@Human.NET"})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(first_subscription.status, StatusCode::CREATED);
+    assert_eq!(
+        first_subscription.json,
+        json!({"already_subscribed": false, "email": "flow@human.net", "subscribed": true})
+    );
+
+    let duplicate_subscription = request_json(
+        &mut app,
+        Method::POST,
+        "/api/subscriptions",
+        Some(json!({"email":"flow@human.net"})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(duplicate_subscription.status, StatusCode::OK);
+    assert_eq!(
+        duplicate_subscription.json,
+        json!({"already_subscribed": true, "email": "flow@human.net", "subscribed": true})
+    );
+
+    let root = request_text(&mut app, Method::GET, "/", None, &[]).await?;
+    assert_eq!(root.status, StatusCode::OK);
+    assert!(root.body.contains("<div id=\"root\"></div>"));
+
+    let spa = request_text(&mut app, Method::GET, "/network/history", None, &[]).await?;
+    assert_eq!(spa.status, StatusCode::OK);
+    assert!(spa.body.contains("<div id=\"root\"></div>"));
+
+    let api_not_found = request_json(&mut app, Method::GET, "/api/nope", None, &[]).await?;
+    assert_eq!(api_not_found.status, StatusCode::NOT_FOUND);
+    assert_eq!(api_not_found.json["error"], "Not found");
+
+    Ok(())
+}
+
+async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Error>> {
+    let config = ServerConfig::from_env_reader(|name| match name {
+        "DATABASE_URL" => Some(database_url.to_owned()),
+        "HOST" => Some("127.0.0.1".to_owned()),
+        "PORT" => Some("8080".to_owned()),
+        _ => None,
+    })?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await?;
+    Ok(create_app(AppDependencies {
+        config: Arc::new(config),
+        db_pool: pool,
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(30_000))),
+    }))
+}
+
+struct TestResponse {
+    status: StatusCode,
+    headers: axum::http::HeaderMap,
+    json: Value,
+}
+
+struct TextResponse {
+    status: StatusCode,
+    body: String,
+}
+
+async fn request_json(
+    app: &mut Router,
+    method: Method,
+    uri: &str,
+    body: Option<Value>,
+    headers: &[(&str, &str)],
+) -> Result<TestResponse, Box<dyn std::error::Error>> {
+    let response = request(app, method, uri, body, headers).await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await?;
+    let json = serde_json::from_slice(&bytes)?;
+    Ok(TestResponse {
+        status,
+        headers,
+        json,
+    })
+}
+
+async fn request_text(
+    app: &mut Router,
+    method: Method,
+    uri: &str,
+    body: Option<Value>,
+    headers: &[(&str, &str)],
+) -> Result<TextResponse, Box<dyn std::error::Error>> {
+    let response = request(app, method, uri, body, headers).await?;
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await?;
+    let body = String::from_utf8(bytes.to_vec())?;
+    Ok(TextResponse { status, body })
+}
+
+async fn request(
+    app: &mut Router,
+    method: Method,
+    uri: &str,
+    body: Option<Value>,
+    headers: &[(&str, &str)],
+) -> Result<axum::response::Response, Box<dyn std::error::Error>> {
+    let body = match body {
+        Some(value) => Body::from(serde_json::to_vec(&value)?),
+        None => Body::empty(),
+    };
+    let mut builder = Request::builder().method(method).uri(uri);
+    for (name, value) in headers {
+        builder = builder.header(*name, *value);
+    }
+    let request = builder.body(body)?;
+    Ok(app.clone().oneshot(request).await?)
+}
+
+fn cookie_header(response: &TestResponse) -> Result<String, Box<dyn std::error::Error>> {
+    let mut cookies = Vec::new();
+    for value in response.headers.get_all(header::SET_COOKIE) {
+        let value = value.to_str()?;
+        let first_pair = value.split(';').next().ok_or("empty set-cookie header")?;
+        cookies.push(first_pair.to_owned());
+    }
+    Ok(cookies.join("; "))
+}
+
+fn is_generated_display_name(value: &str) -> bool {
+    let Some((prefix, suffix)) = value.split_once('_') else {
+        return false;
+    };
+    !prefix.is_empty()
+        && prefix
+            .as_bytes()
+            .first()
+            .is_some_and(|byte| byte.is_ascii_lowercase())
+        && prefix
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+        && suffix.len() == 5
+        && suffix
+            .bytes()
+            .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
+}
+
+async fn insert_message(
+    database_url: &str,
+    faction: &str,
+    display_name: &str,
+    body: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(database_url)
+        .await?;
+    sqlx::query(
+        r#"
+        insert into messages (faction, display_name, body, "user")
+        values ($1::faction, $2, $3, null)
+        "#,
+    )
+    .bind(faction)
+    .bind(display_name)
+    .bind(body)
+    .execute(&pool)
+    .await?;
+    pool.close().await;
+    Ok(())
+}
+
+struct TestPostgres {
+    data_dir: PathBuf,
+    work_dir: PathBuf,
+    port: u16,
+}
+
+impl TestPostgres {
+    fn start() -> Result<Self, Box<dyn std::error::Error>> {
+        let work_dir = unique_temp_dir();
+        let data_dir = work_dir.join("data");
+        fs::create_dir_all(&data_dir)?;
+        run_command(
+            Command::new("chown")
+                .arg("-R")
+                .arg("postgres:postgres")
+                .arg(&work_dir),
+        )?;
+        run_as_postgres(
+            Command::new(format!("{POSTGRES_BIN}/initdb"))
+                .arg("-D")
+                .arg(&data_dir)
+                .arg("-A")
+                .arg("trust"),
+        )?;
+        let port = unused_port()?;
+        let log_path = work_dir.join("postgres.log");
+        run_as_postgres(
+            Command::new(format!("{POSTGRES_BIN}/pg_ctl"))
+                .arg("-D")
+                .arg(&data_dir)
+                .arg("-l")
+                .arg(&log_path)
+                .arg("-o")
+                .arg(format!("-h 127.0.0.1 -p {port}"))
+                .arg("-w")
+                .arg("start"),
+        )?;
+        Ok(Self {
+            data_dir,
+            work_dir,
+            port,
+        })
+    }
+
+    fn database_url(&self) -> String {
+        format!("postgresql://postgres@127.0.0.1:{}/postgres", self.port)
+    }
+
+    fn apply_migrations(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        for migration in [
+            manifest_dir.join("drizzle/0000_baseline.sql"),
+            manifest_dir.join("drizzle/0001_create_core_tables.sql"),
+        ] {
+            run_command(
+                Command::new("psql")
+                    .arg(self.database_url())
+                    .arg("-v")
+                    .arg("ON_ERROR_STOP=1")
+                    .arg("-f")
+                    .arg(migration),
+            )?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for TestPostgres {
+    fn drop(&mut self) {
+        let _ = run_as_postgres(
+            Command::new(format!("{POSTGRES_BIN}/pg_ctl"))
+                .arg("-D")
+                .arg(&self.data_dir)
+                .arg("-m")
+                .arg("fast")
+                .arg("-w")
+                .arg("stop"),
+        );
+        let _ = fs::remove_dir_all(&self.work_dir);
+    }
+}
+
+fn run_as_postgres(command: &mut Command) -> Result<(), Box<dyn std::error::Error>> {
+    let program = command.get_program().to_owned();
+    let args = command
+        .get_args()
+        .map(|arg| arg.to_owned())
+        .collect::<Vec<_>>();
+    let mut runuser = Command::new("runuser");
+    runuser
+        .arg("-u")
+        .arg("postgres")
+        .arg("--")
+        .arg(program)
+        .args(args);
+    run_command(&mut runuser)
+}
+
+fn run_command(command: &mut Command) -> Result<(), Box<dyn std::error::Error>> {
+    let output = command.output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "command failed: status={} stdout={} stderr={}",
+            output.status,
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+    Ok(())
+}
+
+fn unique_temp_dir() -> PathBuf {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+    std::env::temp_dir().join(format!("tlhn-rust-api-test-{}-{nanos}", std::process::id()))
+}
+
+fn unused_port() -> Result<u16, Box<dyn std::error::Error>> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    drop(listener);
+    Ok(port)
+}
