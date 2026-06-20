@@ -174,9 +174,12 @@
     @apply m-0 font-terminal text-3xl font-black uppercase leading-none text-tlhn-bone text-glow-terminal sm:text-4xl;
   }
 
-  .tlhn-network-tally-grid,
-  .tlhn-network-feed-grid {
+  .tlhn-network-tally-grid {
     @apply relative z-10 mt-5 grid gap-4 lg:grid-cols-2;
+  }
+
+  .tlhn-network-feed-section .tlhn-chat-panel {
+    @apply mt-5;
   }
 
   .tlhn-network-composer-section .tlhn-message-composer,
@@ -407,12 +410,20 @@
     @apply border-lover-500/30;
   }
 
+  .tlhn-chat-panel-combined {
+    @apply border-tlhn-bone/15;
+  }
+
   .tlhn-chat-panel-header {
     @apply flex items-center justify-between gap-3 border-b border-tlhn-bone/10 pb-3;
   }
 
   .tlhn-chat-panel-header h3 {
     @apply m-0 text-sm font-bold uppercase text-tlhn-bone;
+  }
+
+  .tlhn-chat-panel-header span {
+    @apply shrink-0 text-xs font-bold uppercase text-tlhn-ash;
   }
 
   .tlhn-chat-state {
@@ -436,8 +447,20 @@
     max-height: calc(15 * 4rem);
   }
 
+  .tlhn-chat-list-combined {
+    @apply pr-2;
+  }
+
   .tlhn-chat-message {
     @apply rounded border border-tlhn-bone/10 bg-tlhn-panel/80 p-3;
+  }
+
+  .tlhn-chat-message-hater {
+    @apply border-hater-500/20;
+  }
+
+  .tlhn-chat-message-lover {
+    @apply border-lover-500/20;
   }
 
   .tlhn-chat-history-status {
@@ -453,15 +476,39 @@
   }
 
   .tlhn-chat-meta {
-    @apply flex items-center justify-between gap-3;
+    @apply grid items-center gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto];
+  }
+
+  .tlhn-chat-avatar {
+    @apply grid h-8 w-8 place-items-center rounded-full border bg-tlhn-void/80 text-base shadow-panel-glitch;
+  }
+
+  .tlhn-chat-avatar-hater {
+    @apply border-hater-500/35 shadow-neon-hater;
+  }
+
+  .tlhn-chat-avatar-lover {
+    @apply border-lover-500/35 shadow-neon-lover;
   }
 
   .tlhn-chat-meta strong {
     @apply min-w-0 truncate text-sm text-tlhn-bone;
   }
 
+  .tlhn-chat-name-hater {
+    @apply text-hater-300 text-glow-hater;
+  }
+
+  .tlhn-chat-name-lover {
+    @apply text-lover-300 text-glow-lover;
+  }
+
+  .tlhn-chat-faction {
+    @apply text-xs font-bold uppercase text-tlhn-ash;
+  }
+
   .tlhn-chat-meta time {
-    @apply shrink-0 text-xs text-tlhn-ash;
+    @apply text-xs text-tlhn-ash sm:shrink-0;
   }
 
   .tlhn-chat-message p {

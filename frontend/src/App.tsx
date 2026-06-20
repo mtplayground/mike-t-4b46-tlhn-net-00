@@ -312,32 +312,7 @@ function NetworkPage() {
               Faction feeds
             </h2>
           </div>
-          <div className="tlhn-network-feed-grid">
-            <FactionFeedPanel
-              accent="hater"
-              faction="ai_haters"
-              isActive={identity?.faction === "ai_haters"}
-              kicker="Red channel"
-              refreshToken={messageRefreshToken}
-              statusLines={[
-                "Resistance node",
-                "Signal hostility high",
-                "Human-first relay",
-              ]}
-            />
-            <FactionFeedPanel
-              accent="lover"
-              faction="ai_lovers"
-              isActive={identity?.faction === "ai_lovers"}
-              kicker="Blue channel"
-              refreshToken={messageRefreshToken}
-              statusLines={[
-                "Ascension node",
-                "Signal affinity high",
-                "Machine-allied relay",
-              ]}
-            />
-          </div>
+          <CombinedChatPanel refreshToken={messageRefreshToken} />
         </section>
         <section
           className="tlhn-network-section tlhn-network-composer-section"
@@ -586,13 +561,11 @@ function EmailSubscriptionForm() {
   );
 }
 
-interface ChatPanelProps {
-  accent: "hater" | "lover";
-  faction: Faction;
+interface CombinedChatPanelProps {
   refreshToken: number;
 }
 
-function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
+function CombinedChatPanel({ refreshToken }: CombinedChatPanelProps) {
   const [messages, setMessages] = useState<MessageResponse[]>([]);
   const messagesRef = useRef<MessageResponse[]>([]);
   const messageListRef = useRef<HTMLOListElement | null>(null);
@@ -615,7 +588,6 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
         const wasNearBottom = isMessageListScrolledNearBottom(messageListRef.current);
         const latestMessageId = currentMessages.at(-1)?.id ?? 0;
         const data = await fetchMessagesPage({
-          faction,
           signal: abortController.signal,
         });
         const latestMessages = toOldestFirst(data.messages);
@@ -657,7 +629,7 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
       abortController.abort();
       window.clearInterval(intervalId);
     };
-  }, [faction, refreshToken]);
+  }, [refreshToken]);
 
   useEffect(() => {
     return () => {
@@ -705,7 +677,6 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
     try {
       const data = await fetchMessagesPage({
         beforeId: oldestLoadedMessageId,
-        faction,
         signal: abortController.signal,
       });
       const olderMessages = toOldestFirst(data.messages);
@@ -752,19 +723,17 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
   };
 
   return (
-    <section className={`tlhn-chat-panel tlhn-chat-panel-${accent}`}>
+    <section className="tlhn-chat-panel tlhn-chat-panel-combined">
       <div className="tlhn-chat-panel-header">
-        <h3>{FACTION_DISPLAY_NAMES[faction]} feed</h3>
+        <h3>Unified network feed</h3>
+        <span>Haters + Lovers</span>
       </div>
       {status === "error" ? (
-        <p
-          className={`tlhn-chat-state tlhn-chat-state-${accent} tlhn-chat-state-error`}
-          role="alert"
-        >
+        <p className="tlhn-chat-state tlhn-chat-state-error" role="alert">
           &gt;_ {errorMessage}
         </p>
       ) : messages.length === 0 ? (
-        <p className={`tlhn-chat-state tlhn-chat-state-${accent}`}>
+        <p className="tlhn-chat-state">
           &gt;_{" "}
           {status === "loading"
             ? "Loading signal..."
@@ -772,7 +741,7 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
         </p>
       ) : (
         <ol
-          className="tlhn-chat-list"
+          className="tlhn-chat-list tlhn-chat-list-combined"
           aria-busy={isLoadingHistory}
           aria-live="polite"
           onScroll={handleMessageListScroll}
@@ -783,17 +752,36 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
               &gt;_ Loading older transmissions...
             </li>
           )}
-          {messages.map((message) => (
-            <li className="tlhn-chat-message" key={message.id}>
-              <div className="tlhn-chat-meta">
-                <strong>{message.display_name}</strong>
-                <time dateTime={message.created_at}>
-                  {formatRelativeTime(message.created_at, now)}
-                </time>
-              </div>
-              <p>{message.body}</p>
-            </li>
-          ))}
+          {messages.map((message) => {
+            const accent = getFactionAccent(message.faction);
+
+            return (
+              <li
+                className={`tlhn-chat-message tlhn-chat-message-${accent}`}
+                key={message.id}
+              >
+                <div className="tlhn-chat-meta">
+                  <span
+                    aria-label={`${FACTION_DISPLAY_NAMES[message.faction]} avatar`}
+                    className={`tlhn-chat-avatar tlhn-chat-avatar-${accent}`}
+                    role="img"
+                  >
+                    {getFactionAvatar(message.faction)}
+                  </span>
+                  <strong className={`tlhn-chat-name tlhn-chat-name-${accent}`}>
+                    {message.display_name}
+                  </strong>
+                  <span className="tlhn-chat-faction">
+                    {FACTION_DISPLAY_NAMES[message.faction]}
+                  </span>
+                  <time dateTime={message.created_at}>
+                    {formatRelativeTime(message.created_at, now)}
+                  </time>
+                </div>
+                <p>{message.body}</p>
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>
@@ -802,7 +790,7 @@ function ChatPanel({ accent, faction, refreshToken }: ChatPanelProps) {
 
 interface FetchMessagesPageOptions {
   beforeId?: number;
-  faction: Faction;
+  faction?: Faction;
   signal?: AbortSignal;
 }
 
@@ -812,9 +800,12 @@ async function fetchMessagesPage({
   signal,
 }: FetchMessagesPageOptions): Promise<ListMessagesResponse> {
   const params = new URLSearchParams({
-    faction,
     limit: String(CHAT_PAGE_SIZE),
   });
+
+  if (faction) {
+    params.set("faction", faction);
+  }
 
   if (beforeId !== undefined) {
     params.set("before_id", String(beforeId));
@@ -1207,6 +1198,14 @@ function isFaction(value: unknown): value is Faction {
   return typeof value === "string" && FACTIONS.includes(value as Faction);
 }
 
+function getFactionAccent(faction: Faction): "hater" | "lover" {
+  return faction === "ai_haters" ? "hater" : "lover";
+}
+
+function getFactionAvatar(faction: Faction): string {
+  return faction === "ai_haters" ? "✊" : "🧠";
+}
+
 interface NetworkTopHeaderProps {
   identity: NetworkIdentity | null;
 }
@@ -1239,48 +1238,6 @@ function NetworkTopHeader({ identity }: NetworkTopHeaderProps) {
         &gt;_ {identity ? `${identity.displayName} connected` : "Identity unassigned"}
       </p>
     </header>
-  );
-}
-
-interface FactionFeedPanelProps {
-  accent: "hater" | "lover";
-  faction: Faction;
-  isActive: boolean;
-  kicker: string;
-  refreshToken: number;
-  statusLines: readonly string[];
-}
-
-function FactionFeedPanel({
-  accent,
-  faction,
-  isActive,
-  kicker,
-  refreshToken,
-  statusLines,
-}: FactionFeedPanelProps) {
-  return (
-    <section
-      className={`tlhn-faction-feed-panel tlhn-faction-feed-panel-${accent}`}
-      data-active={isActive}
-      aria-labelledby={`${faction}-title`}
-    >
-      <div className="tlhn-faction-feed-heading">
-        <div>
-          <p className="tlhn-network-kicker">{kicker}</p>
-          <h3 id={`${faction}-title`} className="tlhn-faction-title">
-            {FACTION_DISPLAY_NAMES[faction]}
-          </h3>
-        </div>
-        <div className="tlhn-faction-meter" aria-hidden="true" />
-      </div>
-      <ul className="tlhn-faction-status">
-        {statusLines.map((line) => (
-          <li key={line}>{line}</li>
-        ))}
-      </ul>
-      <ChatPanel accent={accent} faction={faction} refreshToken={refreshToken} />
-    </section>
   );
 }
 
