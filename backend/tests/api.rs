@@ -113,26 +113,51 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     );
     assert_eq!(created_message.json["message"]["user"], Value::Null);
 
-    let cooldown = request_json(
+    let second_immediate_message = request_json(
         &mut app,
         Method::POST,
         "/api/messages",
-        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Too soon."})),
+        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Second immediate signal."})),
         &[
             (header::CONTENT_TYPE.as_str(), "application/json"),
             ("x-forwarded-for", "192.0.2.24"),
         ],
     )
     .await?;
-    assert_eq!(cooldown.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(second_immediate_message.status, StatusCode::CREATED);
     assert_eq!(
-        cooldown
+        second_immediate_message.json["message"]["body"],
+        "Second immediate signal."
+    );
+
+    let frequency_limit = request_json(
+        &mut app,
+        Method::POST,
+        "/api/messages",
+        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Third immediate signal."})),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            ("x-forwarded-for", "192.0.2.24"),
+        ],
+    )
+    .await?;
+    assert_eq!(frequency_limit.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        frequency_limit
             .headers
             .get(header::RETRY_AFTER)
             .and_then(|value| value.to_str().ok()),
-        Some("30")
+        Some("1")
     );
-    assert_eq!(cooldown.json["error"], "Message post cooldown active");
+    assert_eq!(
+        frequency_limit.json["error"],
+        "Message post rate limit active"
+    );
+    assert_eq!(frequency_limit.json["retry_after_seconds"], 1);
+    let retry_after_ms = frequency_limit.json["retry_after_ms"]
+        .as_u64()
+        .ok_or("retry_after_ms should be an integer")?;
+    assert!((1..=1_000).contains(&retry_after_ms));
 
     for index in 1..=28 {
         insert_message(
@@ -187,6 +212,7 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
             "Paged signal 3",
             "Paged signal 2",
             "Paged signal 1",
+            "Second immediate signal.",
             "End-to-end human signal."
         ]
     );
@@ -258,7 +284,7 @@ async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Err
     Ok(create_app(AppDependencies {
         config: Arc::new(config),
         db_pool: pool,
-        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(30_000))),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(2, 1_000))),
     }))
 }
 
@@ -400,7 +426,8 @@ impl TestPostgres {
                 .arg("-D")
                 .arg(&data_dir)
                 .arg("-A")
-                .arg("trust"),
+                .arg("trust")
+                .arg("--no-sync"),
         )?;
         let port = unused_port()?;
         let log_path = work_dir.join("postgres.log");

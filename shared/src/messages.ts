@@ -42,10 +42,21 @@ export interface CreateMessageResponse {
   message: MessageResponse;
 }
 
-export interface MessagePostRateLimitResponse {
+export interface MessagePostFrequencyLimitResponse {
+  error: "Message post rate limit active";
+  retry_after_ms: number;
+  retry_after_seconds: number;
+  next_allowed_at: string;
+}
+
+export interface MessagePostCooldownResponse {
   error: "Message post cooldown active";
   cooldown_ms: number;
   retry_after_ms: number;
   retry_after_seconds: number;
   next_allowed_at: string;
 }
+
+export type MessagePostRateLimitResponse =
+  | MessagePostFrequencyLimitResponse
+  | MessagePostCooldownResponse;
