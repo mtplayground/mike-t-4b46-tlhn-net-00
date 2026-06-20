@@ -17,3 +17,8 @@ dist/
 .env
 .env.*
 !.env.example
+
+# deployment verification artifacts
+.deploy_url
+ui-verify.cjs
+verify-screenshot.png
