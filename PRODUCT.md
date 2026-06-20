@@ -7,6 +7,8 @@ PostgreSQL-backed state in a monorepo.
 
 ## Current Product
 
+- App shell header includes a larger responsive upper-left `TLHN` wordmark
+  using the terminal font, red Hater color, and glow treatment.
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
