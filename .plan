@@ -1,17 +1,19 @@
-Architecture plan for Issues #111-#112
+# Architecture plan for mobile layout issues #115-#117
 
-Current structure:
-- backend/src/routes/messages.rs owns message validation, client-key detection, in-memory rate limiting, database insert/list handlers, and message route unit tests.
-- shared/src/messages.ts defines the cross-package message DTOs and Zod schemas consumed by the frontend and backend contract expectations.
-- frontend/src/App.tsx contains MessageComposer, cooldown state, post-submit handling, and display of backend retry metadata.
-- backend/tests/api.rs contains integration coverage for message posting, cooldown/rate-limit behavior, and end-to-end API flows.
+## Project/module structure
+- `frontend/src/App.tsx` owns the React route/component structure for the TLHN landing and network pages. The three issues are presentation/layout-only and should not change backend APIs or shared DTO contracts.
+- `frontend/src/styles.css` is the primary implementation surface. It contains the Tailwind component-layer classes for the global shell, landing hero/story, countdown, tally cards, network sections, and chat feed ordering.
+- `shared/src/*` remains the source of product/faction constants and types; no schema/type additions are needed for these issues.
+- `backend/src/*` and database migrations are out of scope unless validation reveals an unrelated build break; these issues do not require persistence changes.
 
-Issue dependencies:
-- #111 must be implemented first: replace the backend 30-second per-client cooldown with a sliding one-second frequency limiter that allows two posts per client key and rejects the third with 429 plus Retry-After/retry_after_ms metadata; reserved limiter entries must be released if DB insert fails.
-- #112 depends on #111: preserve the client-side 30-second cooldown after successful posts, but treat the new backend 429 as a short frequency-limit warning rather than starting or extending the 30-second UI cooldown.
+## Issue dependencies and sequencing
+1. #115 should be implemented first because global shell/header padding and nav sizing affect every page and establish the mobile spacing baseline.
+2. #116 should follow because the landing logo/story must be tuned inside the global shell spacing from #115.
+3. #117 should be last because the network page spacing, countdown/tally compaction, and mobile feed ordering depend on the same responsive spacing rules and may need final balancing against header/shell changes.
 
-Key design decisions:
-- Keep persistence in the existing PostgreSQL/sqlx message tables; no schema change is expected for a frequency limiter because it is transient request state.
-- Model backend 429 response metadata explicitly in shared/src/messages.ts so frontend logic can distinguish server frequency limiting from successful local cooldown behavior.
-- Update backend unit/integration tests around the new 2-msg/sec policy, Retry-After: 1 header, retry_after_ms payload, and DB-failure reservation release path.
-- Update frontend tests/build expectations through existing TypeScript contracts; avoid changing unrelated TLHN layout, branding, routes, auth, storage, or database features.
+## Key design decisions
+- Keep TLHN branding and copy exactly as defined in `PRODUCT.md` and shared constants; only responsive sizing/spacing changes are planned.
+- Use mobile-first Tailwind utilities in `frontend/src/styles.css`, restoring current desktop/tablet appearance with `sm:`/larger responsive overrides where requested.
+- Prefer CSS ordering/flex/grid utilities for the mobile network reorder so `App.tsx` semantics and API behavior remain stable.
+- Preserve accessibility and existing scroll/history behavior for the unified feed; moving the feed visually on mobile must not remove labels, polling, or infinite-history loading.
+- Validate with the existing workspace build/lint scripts after each implementation session, focusing screenshots/manual checks on phone-width layouts and ensuring desktop remains unchanged at `sm:`+ breakpoints.
