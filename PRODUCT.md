@@ -10,10 +10,11 @@ PostgreSQL-backed state in a monorepo.
 - Landing page with a dark glitch/grunge background, red neon `TLHN` logo,
   `THE LAST HUMAN NETWORK` subtitle, terminal-style Human Collapse story, and
   `>_ ENTER THE NETWORK` navigation.
-- `/network` SPA route with a single-column full-width layout: full-width
-  subscription row, large countdown band, compact live tally cards, unified
-  feed, composer, and utility/footer rows. The network page no longer includes
-  a separate TLHN header/action box above the content.
+- `/network` SPA route with a single-column full-width layout ordered as:
+  full-width subscription row, large countdown band, unified feed, composer,
+  Identity/Faction/Transmission utility line, live tally cards, and site footer.
+  The network page no longer includes a separate TLHN header/action box above
+  the content.
 - Required faction-selection modal on first network entry. Joining assigns a
   generated `prefix_xxxxx` display name, increments faction tallies, sets
   HttpOnly faction/name cookies through the API, and stores the identity in
@@ -28,9 +29,11 @@ PostgreSQL-backed state in a monorepo.
   timestamps as minutes, hours/minutes, or days/hours.
 - Message composer posts as the selected faction/name, enforces a 30-second
   cooldown in the UI, and handles backend 429 responses with retry metadata.
-- Compact live faction tally cards poll `/api/factions/counts` and render AI
-  Haters in red with `HUMANS FIGHTING BACK`, AI Lovers in blue with `EMBRACING
-  THE FUTURE`, and neon numerals.
+- Compact live faction tally cards poll `/api/factions/counts`, sit just above
+  the site footer, and render AI Haters in red with `HUMANS FIGHTING BACK`, AI
+  Lovers in blue with `EMBRACING THE FUTURE`, and neon numerals.
+- The Identity / Faction / Transmission utility line appears as three columns on
+  medium and larger screens, stacking vertically on small screens.
 - Large flip-style countdown targets `2029-12-01T07:00:00.000Z`, representing
   2029-12-01 00:00:00 PDT (UTC-07), and is configurable by environment.
 - Full-width neon `KEEP YOUR HUMANITY UPDATES` subscription row sits above the
