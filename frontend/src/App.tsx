@@ -275,8 +275,7 @@ function NetworkPage() {
 
   return (
     <>
-      <section className="tlhn-network-layout" aria-labelledby="network-title">
-        <NetworkTopHeader identity={identity} />
+      <section className="tlhn-network-layout" aria-label="TLHN network">
         <section
           className="tlhn-network-section tlhn-network-subscription-section"
           aria-label="Network subscription"
@@ -1282,40 +1281,6 @@ function FactionLogo({ faction }: FactionLogoProps) {
         strokeWidth="1.8"
       />
     </svg>
-  );
-}
-
-interface NetworkTopHeaderProps {
-  identity: NetworkIdentity | null;
-}
-
-function NetworkTopHeader({ identity }: NetworkTopHeaderProps) {
-  return (
-    <header className="tlhn-network-top-header">
-      <div>
-        <h1 id="network-title" className="tlhn-network-title">
-          {PRODUCT_SHORT_NAME}
-        </h1>
-        <p className="tlhn-network-header-copy">
-          {PRODUCT_NAME} is the last channel between humans resisting the machines and
-          those embracing what comes next.
-        </p>
-      </div>
-      <nav className="tlhn-network-actions" aria-label="Network actions">
-        <a className="tlhn-network-action" href="#network-about">
-          ABOUT TLHN
-        </a>
-        <a
-          className="tlhn-network-action tlhn-network-action-primary"
-          href="#network-join"
-        >
-          JOIN THE NETWORK
-        </a>
-      </nav>
-      <p className="tlhn-network-header-status" role="status">
-        &gt;_ {identity ? `${identity.displayName} connected` : "Identity unassigned"}
-      </p>
-    </header>
   );
 }
 
