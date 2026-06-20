@@ -363,6 +363,7 @@ function NetworkPage() {
             />
           </div>
         </section>
+        <SiteFooter />
       </section>
       {!identity && (
         <FactionSelectionModal joinState={joinState} onJoinFaction={joinFaction} />
@@ -566,6 +567,28 @@ function EmailSubscriptionForm() {
         </p>
       )}
     </form>
+  );
+}
+
+function SiteFooter() {
+  return (
+    <footer className="tlhn-site-footer">
+      <p>© 2025 {PRODUCT_SHORT_NAME}. All rights reserved.</p>
+      <nav className="tlhn-site-footer-links" aria-label="Footer links">
+        <a href="#network-about">Manifesto</a>
+        <a href="#network-about">Privacy</a>
+        <a href="#network-about">Terms</a>
+        <a href="#network-about">Contact</a>
+      </nav>
+      <div className="tlhn-site-footer-social" aria-label="Social links">
+        <a href="#network-about" aria-label="TLHN on X">
+          𝕏
+        </a>
+        <a href="#network-about" aria-label="TLHN on Discord">
+          ◈
+        </a>
+      </div>
+    </footer>
   );
 }
 
