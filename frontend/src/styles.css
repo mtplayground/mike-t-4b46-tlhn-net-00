@@ -549,6 +549,10 @@
     overflow-wrap: anywhere;
   }
 
+  .tlhn-message-expand-button {
+    @apply ml-2 inline-flex cursor-pointer items-center border-0 bg-transparent p-0 font-terminal text-xs font-bold uppercase text-lover-300 underline decoration-lover-500/50 underline-offset-2 transition duration-150 hover:text-lover-100 focus:outline-none focus:ring-2 focus:ring-lover-500 focus:ring-offset-2 focus:ring-offset-tlhn-void;
+  }
+
   .tlhn-message-composer {
     @apply relative z-10 mt-4 rounded-lg border bg-tlhn-void/75 p-3 font-terminal shadow-panel-glitch;
   }
