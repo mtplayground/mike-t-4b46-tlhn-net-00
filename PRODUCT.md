@@ -61,7 +61,7 @@ PostgreSQL-backed state in a monorepo.
   `/api/subscriptions`, validates client-side, and shows success, duplicate, and
   error states.
 - Bottom footer shows `© 2025 TLHN. All rights reserved.`, Manifesto/Privacy/
-  Terms/Contact links, an X link, and a Discord logo link.
+  Terms/Contact links, and an X link pointing to `https://x.com/TheLastHN`.
 
 ## Architecture
 
