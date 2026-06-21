@@ -7,16 +7,21 @@ use serde_json::{json, Value};
 use sqlx::postgres::PgPoolOptions;
 use std::{
     fs,
+    future::Future,
     net::TcpListener,
     path::PathBuf,
+    pin::Pin,
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::{SystemTime, UNIX_EPOCH},
 };
 use tlhn_backend::{
     app::{create_app, AppDependencies},
     config::ServerConfig,
-    email::EmailClient,
+    email::{EmailError, WelcomeEmailSender},
     routes::messages::MessagePostRateLimiter,
 };
 use tower::ServiceExt;
@@ -28,7 +33,8 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
 ) -> Result<(), Box<dyn std::error::Error>> {
     let postgres = TestPostgres::start()?;
     postgres.apply_migrations()?;
-    let mut app = build_app(&postgres.database_url()).await?;
+    let email_sender = FakeWelcomeEmailSender::default();
+    let mut app = build_app(&postgres.database_url(), email_sender.clone()).await?;
 
     let health = request_json(&mut app, Method::GET, "/api/health", None, &[]).await?;
     assert_eq!(health.status, StatusCode::OK);
@@ -227,6 +233,7 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     )
     .await?;
     assert_eq!(invalid_subscription.status, StatusCode::BAD_REQUEST);
+    assert!(email_sender.sent_emails().is_empty());
 
     let first_subscription = request_json(
         &mut app,
@@ -241,6 +248,7 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         first_subscription.json,
         json!({"already_subscribed": false, "email": "flow@human.net", "subscribed": true})
     );
+    assert_eq!(email_sender.sent_emails(), vec!["flow@human.net"]);
 
     let duplicate_subscription = request_json(
         &mut app,
@@ -254,6 +262,26 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert_eq!(
         duplicate_subscription.json,
         json!({"already_subscribed": true, "email": "flow@human.net", "subscribed": true})
+    );
+    assert_eq!(email_sender.sent_emails(), vec!["flow@human.net"]);
+
+    email_sender.set_should_fail(true);
+    let failed_email_subscription = request_json(
+        &mut app,
+        Method::POST,
+        "/api/subscriptions",
+        Some(json!({"email":"failure@human.net"})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(failed_email_subscription.status, StatusCode::CREATED);
+    assert_eq!(
+        failed_email_subscription.json,
+        json!({"already_subscribed": false, "email": "failure@human.net", "subscribed": true})
+    );
+    assert_eq!(
+        email_sender.sent_emails(),
+        vec!["flow@human.net", "failure@human.net"]
     );
 
     let root = request_text(&mut app, Method::GET, "/", None, &[]).await?;
@@ -271,7 +299,10 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     Ok(())
 }
 
-async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Error>> {
+async fn build_app(
+    database_url: &str,
+    email_sender: FakeWelcomeEmailSender,
+) -> Result<Router, Box<dyn std::error::Error>> {
     let config = ServerConfig::from_env_reader(|name| match name {
         "DATABASE_URL" => Some(database_url.to_owned()),
         "HOST" => Some("127.0.0.1".to_owned()),
@@ -283,11 +314,54 @@ async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Err
         .connect(database_url)
         .await?;
     Ok(create_app(AppDependencies {
-        email_client: Arc::new(EmailClient::from_config(&config)),
+        email_client: Arc::new(email_sender),
         config: Arc::new(config),
         db_pool: pool,
         message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(2, 1_000))),
     }))
+}
+
+#[derive(Clone, Default)]
+struct FakeWelcomeEmailSender {
+    sent_emails: Arc<Mutex<Vec<String>>>,
+    should_fail: Arc<AtomicBool>,
+}
+
+impl FakeWelcomeEmailSender {
+    fn sent_emails(&self) -> Vec<String> {
+        self.sent_emails
+            .lock()
+            .expect("fake email mutex should not be poisoned")
+            .clone()
+    }
+
+    fn set_should_fail(&self, should_fail: bool) {
+        self.should_fail.store(should_fail, Ordering::SeqCst);
+    }
+}
+
+impl WelcomeEmailSender for FakeWelcomeEmailSender {
+    fn send_welcome_email<'a>(
+        &'a self,
+        email: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<(), EmailError>> + Send + 'a>> {
+        let sent_emails = Arc::clone(&self.sent_emails);
+        let should_fail = self.should_fail.load(Ordering::SeqCst);
+        let email = email.to_owned();
+
+        Box::pin(async move {
+            sent_emails
+                .lock()
+                .expect("fake email mutex should not be poisoned")
+                .push(email);
+
+            if should_fail {
+                Err(EmailError::RateLimited)
+            } else {
+                Ok(())
+            }
+        })
+    }
 }
 
 struct TestResponse {

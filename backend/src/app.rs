@@ -1,6 +1,6 @@
 use crate::{
     config::ServerConfig,
-    email::EmailClient,
+    email::{EmailClient, WelcomeEmailSender},
     routes::{factions, health::health, messages, subscriptions},
 };
 use axum::{
@@ -29,7 +29,7 @@ use tower_http::{
 pub struct AppDependencies {
     pub config: Arc<ServerConfig>,
     pub db_pool: PgPool,
-    pub email_client: Arc<EmailClient>,
+    pub email_client: Arc<dyn WelcomeEmailSender>,
     pub message_post_rate_limiter: Arc<Mutex<messages::MessagePostRateLimiter>>,
 }
 
