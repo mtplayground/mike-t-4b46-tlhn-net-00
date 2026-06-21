@@ -1,6 +1,7 @@
 use crate::config::ServerConfig;
 use reqwest::StatusCode;
 use serde::Serialize;
+use std::{future::Future, pin::Pin};
 use thiserror::Error;
 
 const WELCOME_SUBJECT: &str = "Welcome to The Last Human Network";
@@ -31,6 +32,13 @@ pub enum EmailError {
     SendFailed { status: StatusCode, body: String },
     #[error("email request failed: {0}")]
     Request(#[from] reqwest::Error),
+}
+
+pub trait WelcomeEmailSender: Send + Sync {
+    fn send_welcome_email<'a>(
+        &'a self,
+        email: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<(), EmailError>> + Send + 'a>>;
 }
 
 #[derive(Serialize)]
@@ -76,7 +84,7 @@ impl EmailClient {
         }
     }
 
-    pub async fn send_welcome_email(&self, email: &str) -> Result<(), EmailError> {
+    async fn send_welcome_email_internal(&self, email: &str) -> Result<(), EmailError> {
         let EmailClientMode::Platform {
             endpoint_url,
             app_token,
@@ -124,7 +132,19 @@ impl EmailClient {
     }
 }
 
-pub async fn send_welcome_email(email_client: &EmailClient, email: &str) -> Result<(), EmailError> {
+impl WelcomeEmailSender for EmailClient {
+    fn send_welcome_email<'a>(
+        &'a self,
+        email: &'a str,
+    ) -> Pin<Box<dyn Future<Output = Result<(), EmailError>> + Send + 'a>> {
+        Box::pin(self.send_welcome_email_internal(email))
+    }
+}
+
+pub async fn send_welcome_email(
+    email_client: &dyn WelcomeEmailSender,
+    email: &str,
+) -> Result<(), EmailError> {
     email_client.send_welcome_email(email).await
 }
 
@@ -162,7 +182,7 @@ mod tests {
     async fn disabled_client_skips_welcome_email() {
         let client = EmailClient::from_config(&base_config());
         client
-            .send_welcome_email("human@example.test")
+            .send_welcome_email_internal("human@example.test")
             .await
             .expect("disabled email client should be a no-op");
     }
