@@ -37,7 +37,9 @@ PostgreSQL-backed state in a monorepo.
 - Chat feed initially loads the latest 25 messages, renders oldest-to-newest so
   the newest message sits at the bottom, supports scroll-up infinite history
   loading via `before_id` while preserving scroll position, and formats relative
-  timestamps as minutes, hours/minutes, or days/hours.
+  timestamps as minutes, hours/minutes, or days/hours. Message bodies longer
+  than 256 characters collapse behind a terminal-styled `… more` expansion
+  control while the composer remains capped at 1000 characters.
 - Message composer posts as the selected faction/name and enforces a
   30-second cooldown strictly in the client UI after successful posts. The
   server separately applies a transient frequency limiter of at most two
