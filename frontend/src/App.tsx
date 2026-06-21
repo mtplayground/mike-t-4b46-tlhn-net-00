@@ -55,6 +55,7 @@ const CHAT_PAGE_SIZE = 25;
 const CHAT_HISTORY_SCROLL_THRESHOLD_PX = 48;
 const CHAT_BOTTOM_SCROLL_THRESHOLD_PX = 80;
 const MESSAGE_POST_FREQUENCY_LIMIT_NOTICE_MS = 1_500;
+const MESSAGE_COLLAPSE_THRESHOLD_CHARS = 256;
 const INITIAL_FACTION_COUNTS: FactionCounts = {
   ai_haters: 0,
   ai_lovers: 0,
@@ -811,13 +812,40 @@ function CombinedChatPanel({ refreshToken }: CombinedChatPanelProps) {
                     {formatRelativeTime(message.created_at, now)}
                   </time>
                 </div>
-                <p>{message.body}</p>
+                <ExpandableMessageBody body={message.body} />
               </li>
             );
           })}
         </ol>
       )}
     </section>
+  );
+}
+
+interface ExpandableMessageBodyProps {
+  body: string;
+}
+
+function ExpandableMessageBody({ body }: ExpandableMessageBodyProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const shouldCollapse = body.length > MESSAGE_COLLAPSE_THRESHOLD_CHARS;
+
+  if (!shouldCollapse || isExpanded) {
+    return <p>{body}</p>;
+  }
+
+  return (
+    <p>
+      {body.slice(0, MESSAGE_COLLAPSE_THRESHOLD_CHARS)}
+      <button
+        aria-expanded={isExpanded}
+        className="tlhn-message-expand-button"
+        onClick={() => setIsExpanded(true)}
+        type="button"
+      >
+        … more
+      </button>
+    </p>
   );
 }
 
