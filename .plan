@@ -1,15 +1,16 @@
-# Architecture plan for Issue #129: Put faction tallies above the chat feed in mobile order
+# Architecture plan for Issue #131: Collapse long messages with an expand ("… more") control
 
 ## Module structure, file organization, shared types
-- `frontend/src/App.tsx` defines the TLHN network page section markup in semantic order: countdown, live faction tallies, unified chat feed, composer, and lower page sections.
-- `frontend/src/styles.css` owns the Tailwind component-layer layout rules, including mobile-only `order` values for `.tlhn-network-layout` children and the desktop reset at `@media (min-width: 640px)`.
-- `shared/src/*`, `backend/src/*`, database migrations, and API types are out of scope because this is a responsive presentation-only change.
+- `frontend/src/App.tsx` renders the unified network chat feed and currently outputs message text inline in each chat card. The new `ExpandableMessageBody` React component should live in this file near the chat feed/message helpers because the behavior is local UI state only.
+- `frontend/src/styles.css` owns the Tailwind component-layer styles for chat message text. Add `.tlhn-message-expand-button` there so the new control matches the TLHN terminal/neon visual system.
+- `shared/src/*`, `backend/src/*`, database migrations, and API DTOs are out of scope: message bodies are already persisted and limited by existing contracts; this issue only changes presentation of already-fetched text.
 
 ## Dependencies between issues
-- Issue #129 has no blocking dependencies.
-- It adjusts mobile ordering introduced by earlier layout work: countdown remains first, tallies should be second, feed third, composer fourth. Desktop order must continue to reset at `min-width: 640px`.
+- Issue #131 has no blocking dependencies.
+- It builds on the existing combined feed and message composer, preserving the current 1000-character composer limit and server validation.
 
 ## Key design decisions
-- Implement the fix only in CSS by changing mobile `order` assignments: `.tlhn-network-tallies { order: 2; }` and `.tlhn-network-feed-section { order: 3; }`.
-- Preserve DOM order, React components, ARIA labels, feed state handling, chat scrolling, and desktop layout behavior.
-- Validate with the frontend typecheck/build or the root build to ensure Tailwind class processing still succeeds.
+- Use a 256-character threshold exactly as requested. Bodies at or below the threshold render as plain full text; longer bodies render a truncated prefix plus a keyboard-accessible `… more` button.
+- Keep expansion state per rendered message body using local component state; no persistence, API calls, or global state are needed.
+- Preserve existing chat card layout, faction coloring, timestamps, scrolling, pagination, and relative time behavior.
+- Validate with the frontend build/typecheck and, when available, the root build.
