@@ -1,16 +1,20 @@
-# Architecture plan for Issue #131: Collapse long messages with an expand ("… more") control
+Architecture plan for Issue #133: Remove footer Discord link and point the X icon to the real profile
 
-## Module structure, file organization, shared types
-- `frontend/src/App.tsx` renders the unified network chat feed and currently outputs message text inline in each chat card. The new `ExpandableMessageBody` React component should live in this file near the chat feed/message helpers because the behavior is local UI state only.
-- `frontend/src/styles.css` owns the Tailwind component-layer styles for chat message text. Add `.tlhn-message-expand-button` there so the new control matches the TLHN terminal/neon visual system.
-- `shared/src/*`, `backend/src/*`, database migrations, and API DTOs are out of scope: message bodies are already persisted and limited by existing contracts; this issue only changes presentation of already-fetched text.
+Project structure:
+- frontend/: Vite + React SPA. The footer UI is implemented in frontend/src/App.tsx, with styling in frontend/src/styles.css.
+- backend/: Rust Axum API and static frontend host. No backend/API changes are needed for this issue.
+- shared/: shared TypeScript constants and DTOs. No shared contract changes are needed.
 
-## Dependencies between issues
-- Issue #131 has no blocking dependencies.
-- It builds on the existing combined feed and message composer, preserving the current 1000-character composer limit and server validation.
+Issue dependencies:
+- Issue #133 is standalone and only depends on the existing SiteFooter component from prior UI work.
 
-## Key design decisions
-- Use a 256-character threshold exactly as requested. Bodies at or below the threshold render as plain full text; longer bodies render a truncated prefix plus a keyboard-accessible `… more` button.
-- Keep expansion state per rendered message body using local component state; no persistence, API calls, or global state are needed.
-- Preserve existing chat card layout, faction coloring, timestamps, scrolling, pagination, and relative time behavior.
-- Validate with the frontend build/typecheck and, when available, the root build.
+Implementation plan:
+- Update SiteFooter in frontend/src/App.tsx.
+- Remove the Discord social anchor and inline SVG entirely.
+- Change the X social anchor from its placeholder/hash link to https://x.com/TheLastHN.
+- Ensure the X link opens in a new tab with rel="noreferrer" and target="_blank".
+- Keep product branding from PRODUCT.md and existing shared constants; do not rename the product.
+
+Validation:
+- Run TypeScript/build checks for the frontend through npm scripts.
+- Confirm footer still renders and no stale Discord reference remains in the footer markup.
