@@ -1,20 +1,18 @@
-Architecture plan for Issue #133: Remove footer Discord link and point the X icon to the real profile
+Architecture plan for Issues #135 and #136: Resend welcome email for subscriptions
 
 Project structure:
-- frontend/: Vite + React SPA. The footer UI is implemented in frontend/src/App.tsx, with styling in frontend/src/styles.css.
-- backend/: Rust Axum API and static frontend host. No backend/API changes are needed for this issue.
-- shared/: shared TypeScript constants and DTOs. No shared contract changes are needed.
+- backend/: Rust Axum API, PostgreSQL access via sqlx, route handlers under backend/src/routes/.
+- frontend/: Vite React SPA. No frontend changes are expected for these issues.
+- shared/: TypeScript DTO/schema contracts. Existing subscription response types should remain stable unless the backend response shape changes.
 
-Issue dependencies:
-- Issue #133 is standalone and only depends on the existing SiteFooter component from prior UI work.
+Issue dependency order:
+1. #135 adds the email infrastructure: backend/src/email.rs, config values for RESEND_API_KEY and NEWSLETTER_FROM_EMAIL, and AppDependencies wiring.
+2. #136 depends on #135 and calls the email client after a new subscription insert, skipping duplicate subscriptions.
 
-Implementation plan:
-- Update SiteFooter in frontend/src/App.tsx.
-- Remove the Discord social anchor and inline SVG entirely.
-- Change the X social anchor from its placeholder/hash link to https://x.com/TheLastHN.
-- Ensure the X link opens in a new tab with rel="noreferrer" and target="_blank".
-- Keep product branding from PRODUCT.md and existing shared constants; do not rename the product.
-
-Validation:
-- Run TypeScript/build checks for the frontend through npm scripts.
-- Confirm footer still renders and no stale Discord reference remains in the footer markup.
+Key design decisions:
+- Keep email sending behind a small Rust email client abstraction so route code does not know Resend request details.
+- The email client should be safe by default: if RESEND_API_KEY or NEWSLETTER_FROM_EMAIL is absent/blank, it becomes a no-op and logs rather than failing app startup.
+- Subscription database persistence remains the source of truth; email failures are logged and must not fail successful new subscription requests.
+- Duplicate subscriptions should not trigger welcome email sends.
+- Configuration belongs in backend/src/config.rs and should be documented in .env.example/README as needed.
+- Tests should be able to verify whether a send was requested without making real network calls, likely by injecting a test/dummy email client through AppDependencies.
