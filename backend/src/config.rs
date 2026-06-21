@@ -16,6 +16,10 @@ pub struct ServerConfig {
     pub node_env: String,
     pub polling_interval_ms: u64,
     pub countdown_deadline_iso: String,
+    pub resend_api_key: Option<String>,
+    pub newsletter_from_email: Option<String>,
+    pub mctai_email_url: Option<String>,
+    pub mctai_email_app_token: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -53,8 +57,18 @@ impl ServerConfig {
                 "COUNTDOWN_DEADLINE_ISO",
                 DEFAULT_COUNTDOWN_DEADLINE_ISO,
             )?,
+            resend_api_key: optional_non_empty(read_env("RESEND_API_KEY")),
+            newsletter_from_email: optional_non_empty(read_env("NEWSLETTER_FROM_EMAIL")),
+            mctai_email_url: optional_non_empty(read_env("MCTAI_EMAIL_URL")),
+            mctai_email_app_token: optional_non_empty(read_env("MCTAI_EMAIL_APP_TOKEN")),
         })
     }
+}
+
+fn optional_non_empty(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_owned())
+        .filter(|value| !value.is_empty())
 }
 
 fn parse_port(value: Option<String>, name: &'static str) -> Result<u16, ConfigError> {
@@ -146,6 +160,33 @@ mod tests {
             DEFAULT_COUNTDOWN_DEADLINE_ISO
         );
         assert!(config.database_url.contains("sslmode=require"));
+        assert_eq!(config.resend_api_key, None);
+        assert_eq!(config.newsletter_from_email, None);
+        assert_eq!(config.mctai_email_url, None);
+        assert_eq!(config.mctai_email_app_token, None);
+    }
+
+    #[test]
+    fn reads_email_configuration() {
+        let config = config_from(&[
+            ("DATABASE_URL", "postgresql://example.test/db"),
+            ("RESEND_API_KEY", " resend_legacy_key "),
+            ("NEWSLETTER_FROM_EMAIL", " hello@example.test "),
+            ("MCTAI_EMAIL_URL", " https://email.example.test/send "),
+            ("MCTAI_EMAIL_APP_TOKEN", " app_token "),
+        ])
+        .expect("config should parse");
+
+        assert_eq!(config.resend_api_key.as_deref(), Some("resend_legacy_key"));
+        assert_eq!(
+            config.newsletter_from_email.as_deref(),
+            Some("hello@example.test")
+        );
+        assert_eq!(
+            config.mctai_email_url.as_deref(),
+            Some("https://email.example.test/send")
+        );
+        assert_eq!(config.mctai_email_app_token.as_deref(), Some("app_token"));
     }
 
     #[test]

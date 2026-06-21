@@ -16,6 +16,7 @@ use std::{
 use tlhn_backend::{
     app::{create_app, AppDependencies},
     config::ServerConfig,
+    email::EmailClient,
     routes::messages::MessagePostRateLimiter,
 };
 use tower::ServiceExt;
@@ -282,6 +283,7 @@ async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Err
         .connect(database_url)
         .await?;
     Ok(create_app(AppDependencies {
+        email_client: Arc::new(EmailClient::from_config(&config)),
         config: Arc::new(config),
         db_pool: pool,
         message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(2, 1_000))),

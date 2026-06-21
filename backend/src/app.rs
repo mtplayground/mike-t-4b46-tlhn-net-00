@@ -1,5 +1,6 @@
 use crate::{
     config::ServerConfig,
+    email::EmailClient,
     routes::{factions, health::health, messages, subscriptions},
 };
 use axum::{
@@ -28,14 +29,17 @@ use tower_http::{
 pub struct AppDependencies {
     pub config: Arc<ServerConfig>,
     pub db_pool: PgPool,
+    pub email_client: Arc<EmailClient>,
     pub message_post_rate_limiter: Arc<Mutex<messages::MessagePostRateLimiter>>,
 }
 
 impl AppDependencies {
     pub fn new(config: ServerConfig, db_pool: PgPool) -> Self {
+        let email_client = Arc::new(EmailClient::from_config(&config));
         Self {
             config: Arc::new(config),
             db_pool,
+            email_client,
             message_post_rate_limiter: Arc::new(Mutex::new(
                 messages::MessagePostRateLimiter::default(),
             )),
