@@ -195,7 +195,7 @@
   }
 
   .tlhn-network-composer-section .tlhn-message-composer {
-    @apply mt-5;
+    @apply mt-0;
   }
 
   .tlhn-network-subscription-section {
@@ -553,15 +553,13 @@
   }
 
   .tlhn-message-composer {
-    @apply relative z-10 mt-4 rounded-lg border bg-tlhn-void/75 p-3 font-terminal shadow-panel-glitch;
+    @apply relative z-10 font-terminal;
   }
 
   .tlhn-message-composer-hater {
-    @apply border-hater-500/40;
   }
 
   .tlhn-message-composer-lover {
-    @apply border-lover-500/40;
   }
 
   .tlhn-message-composer-label {
@@ -573,7 +571,7 @@
   }
 
   .tlhn-message-input {
-    @apply min-h-11 min-w-0 rounded border border-tlhn-bone/15 bg-tlhn-panel/90 px-3 text-sm text-tlhn-bone outline-none transition duration-150 placeholder:text-tlhn-ash/75 disabled:cursor-wait disabled:opacity-65;
+    @apply min-h-[5.5rem] min-w-0 resize-none overflow-hidden rounded border border-tlhn-bone/15 bg-tlhn-panel/90 px-3 py-2 text-sm leading-6 text-tlhn-bone outline-none transition duration-150 placeholder:text-tlhn-ash/75 disabled:cursor-wait disabled:opacity-65;
   }
 
   .tlhn-message-composer-hater .tlhn-message-input {
