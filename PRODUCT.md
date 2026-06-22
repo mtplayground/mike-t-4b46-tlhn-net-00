@@ -42,12 +42,12 @@ PostgreSQL-backed state in a monorepo.
   control while the composer remains capped at 1000 characters.
 - Message composer posts as the selected faction/name and enforces a
   30-second cooldown strictly in the client UI after successful posts. The
-  server separately applies a transient frequency limiter of at most two
+  server separately applies a transient frequency limiter of at most three
   messages per client per second; its `429` response shows a brief "slow down"
   notice without starting the 30-second cooldown.
 - Compact live faction tally cards poll `/api/factions/counts`; they render AI
-  Haters in red with `HUMANS FIGHTING BACK`, AI Lovers in blue with `EMBRACING
-  THE FUTURE`, and neon numerals. Phone layouts reduce tally padding,
+  Haters in red with `HUMANS FIGHTING BACK`, AI Lovers in blue with
+  `EMBRACING THE FUTURE`, and neon numerals. Phone layouts reduce tally padding,
   min-height, label size, and count size while restoring larger cards at `sm:`+.
 - The Identity / Faction / Transmission utility line appears as three columns on
   medium and larger screens, stacks vertically on small screens, and uses tight
@@ -106,8 +106,8 @@ PostgreSQL-backed state in a monorepo.
   - `limit` defaults to 25 and is capped at 50.
   - `before_id` pages older messages using the message id cursor.
 - `POST /api/messages`
-  - Accepts at most two messages per client key in a sliding one-second window.
-  - The third immediate post returns `429`, `Retry-After: 1`, and
+  - Accepts at most three messages per client key in a sliding one-second window.
+  - The fourth immediate post returns `429`, `Retry-After: 1`, and
     `retry_after_ms` / `retry_after_seconds` metadata with
     `Message post rate limit active`.
 - `POST /api/subscriptions`
