@@ -1,18 +1,23 @@
-Architecture plan for Issues #135 and #136: Resend welcome email for subscriptions
+Architecture plan for Issue #147: Re-enable backend message post rate limiter at 3 posts/second
 
-Project structure:
-- backend/: Rust Axum API, PostgreSQL access via sqlx, route handlers under backend/src/routes/.
-- frontend/: Vite React SPA. No frontend changes are expected for these issues.
-- shared/: TypeScript DTO/schema contracts. Existing subscription response types should remain stable unless the backend response shape changes.
+Repository shape:
+- Monorepo with Rust Axum backend in backend/, React/Vite frontend in frontend/, and shared TypeScript DTO/contracts in shared/.
+- Backend route modules live under backend/src/routes/. Message posting and rate-limiting behavior is localized to backend/src/routes/messages.rs.
+- App wiring and shared dependencies are in backend/src/app.rs. AppDependencies owns an Arc<Mutex<MessagePostRateLimiter>> used by the messages create handler.
+- PostgreSQL persistence remains unchanged for this issue; no migration is needed.
+- Frontend behavior and shared TypeScript types should not need changes unless API response shape changes, which this issue does not require.
 
-Issue dependency order:
-1. #135 adds the email infrastructure: backend/src/email.rs, config values for RESEND_API_KEY and NEWSLETTER_FROM_EMAIL, and AppDependencies wiring.
-2. #136 depends on #135 and calls the email client after a new subscription insert, skipping duplicate subscriptions.
+Issue dependency analysis:
+- There is only one issue in this batch: #147.
+- It is independent and can be implemented directly.
+- The issue explicitly reverses a prior temporary disable from Issue 2.11, so the implementation should inspect current create() logic and restore the existing limiter reservation/denial flow rather than designing a new rate limiter.
 
 Key design decisions:
-- Keep email sending behind a small Rust email client abstraction so route code does not know Resend request details.
-- The email client should be safe by default: if RESEND_API_KEY or NEWSLETTER_FROM_EMAIL is absent/blank, it becomes a no-op and logs rather than failing app startup.
-- Subscription database persistence remains the source of truth; email failures are logged and must not fail successful new subscription requests.
-- Duplicate subscriptions should not trigger welcome email sends.
-- Configuration belongs in backend/src/config.rs and should be documented in .env.example/README as needed.
-- Tests should be able to verify whether a send was requested without making real network calls, likely by injecting a test/dummy email client through AppDependencies.
+- Keep the existing one-second window constant: MESSAGE_POST_FREQUENCY_LIMIT_WINDOW_MS = 1000.
+- Set MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES to 3.
+- In backend/src/routes/messages.rs create(), validate JSON and message payload first, then run the rate-limit reservation before inserting into PostgreSQL.
+- If limiter denies, return HTTP 429 with Retry-After: 1 and existing retry metadata JSON.
+- If DB insert fails after a successful reservation, release that reservation to avoid false throttling.
+- Rate-limit keying should continue to use the existing client key helper, preserving proxy/header behavior already in the codebase.
+- Update Rust unit tests for MessagePostRateLimiter so three reservations inside the one-second window are allowed and the fourth is denied.
+- Validation target: cargo test --manifest-path backend/Cargo.toml. Full repo validation remains npm test if Node dependencies are available.
