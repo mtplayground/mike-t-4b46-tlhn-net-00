@@ -82,13 +82,6 @@ Required runtime environment:
   `5000`.
 - `COUNTDOWN_DEADLINE_ISO` - countdown deadline metadata, defaults to
   `2029-12-01T07:00:00.000Z`.
-- `MCTAI_EMAIL_URL` and `MCTAI_EMAIL_APP_TOKEN` - optional platform email
-  service endpoint and credential for server-side welcome emails. If either is
-  absent, email sending is a no-op that logs.
-- `NEWSLETTER_FROM_EMAIL` - optional reply-to address for newsletter/welcome
-  email messages.
-- `RESEND_API_KEY` - legacy compatibility config only; the app does not call
-  Resend directly in production.
 
 Required frontend build-time environment:
 
@@ -111,5 +104,3 @@ settings when needed.
   before returning generic server errors.
 - Message posting accepts at most three messages per client per second; the
   fourth immediate post returns `429` with retry metadata.
-- Welcome-email delivery is routed through the platform email service from the
-  Rust backend and degrades to a logged no-op when email env vars are absent.
