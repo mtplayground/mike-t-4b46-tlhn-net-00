@@ -109,5 +109,7 @@ settings when needed.
 - Health checks are available at `/api/health` and include database status.
 - API errors return JSON; database failures are logged by the Rust route handlers
   before returning generic server errors.
+- Message posting accepts at most three messages per client per second; the
+  fourth immediate post returns `429` with retry metadata.
 - Welcome-email delivery is routed through the platform email service from the
   Rust backend and degrades to a logged no-op when email env vars are absent.

@@ -154,6 +154,38 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         "Third immediate signal."
     );
 
+    let fourth_immediate_message = request_json(
+        &mut app,
+        Method::POST,
+        "/api/messages",
+        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Fourth immediate signal."})),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            ("x-forwarded-for", "192.0.2.24"),
+        ],
+    )
+    .await?;
+    assert_eq!(fourth_immediate_message.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(
+        fourth_immediate_message.json["error"],
+        "Message post rate limit active"
+    );
+    assert_eq!(
+        fourth_immediate_message
+            .headers
+            .get(header::RETRY_AFTER)
+            .and_then(|value| value.to_str().ok()),
+        Some("1")
+    );
+    assert_eq!(
+        fourth_immediate_message.json["retry_after_seconds"],
+        json!(1)
+    );
+    assert!(fourth_immediate_message.json["retry_after_ms"]
+        .as_u64()
+        .is_some_and(|retry_after_ms| (1..=1_000).contains(&retry_after_ms)));
+    assert!(fourth_immediate_message.json["next_allowed_at"].is_string());
+
     for index in 1..=28 {
         insert_message(
             postgres.database_url().as_str(),
@@ -306,7 +338,7 @@ async fn build_app(
         email_client: Arc::new(email_sender),
         config: Arc::new(config),
         db_pool: pool,
-        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(2, 1_000))),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 1_000))),
     }))
 }
 

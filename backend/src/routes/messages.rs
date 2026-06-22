@@ -17,7 +17,7 @@ use url::form_urlencoded;
 const DEFAULT_LIMIT: i64 = 25;
 const MAX_LIMIT: i64 = 50;
 const MESSAGE_POST_FREQUENCY_LIMIT_WINDOW_MS: u64 = 1_000;
-const MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES: usize = 2;
+const MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES: usize = 3;
 
 #[derive(Clone, Debug)]
 struct ListMessagesQuery {
@@ -100,7 +100,7 @@ pub async fn list(State(state): State<AppDependencies>, RawQuery(raw_query): Raw
 
 pub async fn create(
     State(state): State<AppDependencies>,
-    _headers: HeaderMap,
+    headers: HeaderMap,
     body: Result<Json<CreateMessageRequest>, JsonRejection>,
 ) -> Response {
     let body = match body {
@@ -112,11 +112,43 @@ pub async fn create(
         Err(response) => return response.into_response(),
     };
 
+    let rate_limit_key = get_message_post_rate_limit_key(&headers);
+    let reservation = {
+        let mut limiter = match state.message_post_rate_limiter.lock() {
+            Ok(limiter) => limiter,
+            Err(error) => {
+                tracing::error!(
+                    name = "PoisonError",
+                    message = %error,
+                    "Message post rate limiter lock poisoned"
+                );
+                return (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: "Internal server error",
+                    }),
+                )
+                    .into_response();
+            }
+        };
+        limiter.reserve(rate_limit_key)
+    };
+
+    let allowed = match reservation {
+        RateLimitDecision::Allowed(allowed) => allowed,
+        RateLimitDecision::Denied(denied) => {
+            return send_rate_limit_response(denied).into_response()
+        }
+    };
+
     match insert_message(&state, &message).await {
         Ok(message) => {
             (StatusCode::CREATED, Json(CreateMessageResponse { message })).into_response()
         }
-        Err(error) => internal_server_error(error).into_response(),
+        Err(error) => {
+            release_rate_limit_reservation(&state, &allowed);
+            internal_server_error(error).into_response()
+        }
     }
 }
 
@@ -128,14 +160,12 @@ struct ValidCreateMessage {
 }
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 enum RateLimitDecision {
     Allowed(MessagePostRateLimitAllowed),
     Denied(MessagePostRateLimitDenied),
 }
 
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct MessagePostRateLimiter {
     max_messages_per_window: usize,
     window: Duration,
@@ -151,7 +181,6 @@ impl Default for MessagePostRateLimiter {
     }
 }
 
-#[allow(dead_code)]
 impl MessagePostRateLimiter {
     pub fn new(max_messages_per_window: usize, window_ms: u64) -> Self {
         Self {
@@ -433,7 +462,6 @@ fn invalid_response(
     )
 }
 
-#[allow(dead_code)]
 fn send_rate_limit_response(
     rate_limit: MessagePostRateLimitDenied,
 ) -> (StatusCode, HeaderMap, Json<MessagePostRateLimitResponse>) {
@@ -454,7 +482,6 @@ fn send_rate_limit_response(
     )
 }
 
-#[allow(dead_code)]
 fn release_rate_limit_reservation(state: &AppDependencies, allowed: &MessagePostRateLimitAllowed) {
     match state.message_post_rate_limiter.lock() {
         Ok(mut limiter) => limiter.release(&allowed.key, allowed.reserved_at),
@@ -482,7 +509,6 @@ fn internal_server_error(error: sqlx::Error) -> (StatusCode, Json<ErrorResponse>
     )
 }
 
-#[allow(dead_code)]
 fn get_message_post_rate_limit_key(headers: &HeaderMap) -> String {
     get_first_header_value(headers, "x-forwarded-for")
         .or_else(|| get_first_header_value(headers, "fly-client-ip"))
@@ -491,7 +517,6 @@ fn get_message_post_rate_limit_key(headers: &HeaderMap) -> String {
         .unwrap_or_else(|| "unknown-client".to_owned())
 }
 
-#[allow(dead_code)]
 fn get_first_header_value(headers: &HeaderMap, name: &str) -> Option<String> {
     headers
         .get(name)
@@ -502,7 +527,6 @@ fn get_first_header_value(headers: &HeaderMap, name: &str) -> Option<String> {
         .map(ToOwned::to_owned)
 }
 
-#[allow(dead_code)]
 fn system_time_to_iso(value: SystemTime) -> String {
     DateTime::<Utc>::from(value).to_rfc3339_opts(chrono::SecondsFormat::Millis, true)
 }
@@ -583,24 +607,29 @@ mod tests {
     }
 
     #[test]
-    fn rate_limiter_allows_two_reservations_per_window_and_releases() {
-        let mut limiter = MessagePostRateLimiter::new(2, 1_000);
+    fn rate_limiter_allows_three_reservations_per_window_and_releases() {
+        let mut limiter = MessagePostRateLimiter::new(3, 1_000);
         let first = limiter.reserve("client".to_owned());
         let RateLimitDecision::Allowed(first) = first else {
             panic!("first reservation should be allowed");
         };
 
-        assert!(matches!(
-            limiter.reserve("client".to_owned()),
-            RateLimitDecision::Allowed(_)
-        ));
+        for reservation_number in 2..=3 {
+            assert!(
+                matches!(
+                    limiter.reserve("client".to_owned()),
+                    RateLimitDecision::Allowed(_)
+                ),
+                "reservation {reservation_number} should be allowed"
+            );
+        }
 
-        let third = limiter.reserve("client".to_owned());
-        let RateLimitDecision::Denied(third) = third else {
-            panic!("third reservation in the same window should be denied");
+        let fourth = limiter.reserve("client".to_owned());
+        let RateLimitDecision::Denied(fourth) = fourth else {
+            panic!("fourth reservation in the same window should be denied");
         };
-        assert_eq!(third.retry_after_seconds, 1);
-        assert!((1..=1_000).contains(&third.retry_after_ms));
+        assert_eq!(fourth.retry_after_seconds, 1);
+        assert!((1..=1_000).contains(&fourth.retry_after_ms));
 
         limiter.release(&first.key, first.reserved_at);
         assert!(matches!(
