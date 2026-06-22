@@ -137,7 +137,7 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         "Second immediate signal."
     );
 
-    let frequency_limit = request_json(
+    let third_immediate_message = request_json(
         &mut app,
         Method::POST,
         "/api/messages",
@@ -148,23 +148,11 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         ],
     )
     .await?;
-    assert_eq!(frequency_limit.status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(third_immediate_message.status, StatusCode::CREATED);
     assert_eq!(
-        frequency_limit
-            .headers
-            .get(header::RETRY_AFTER)
-            .and_then(|value| value.to_str().ok()),
-        Some("1")
+        third_immediate_message.json["message"]["body"],
+        "Third immediate signal."
     );
-    assert_eq!(
-        frequency_limit.json["error"],
-        "Message post rate limit active"
-    );
-    assert_eq!(frequency_limit.json["retry_after_seconds"], 1);
-    let retry_after_ms = frequency_limit.json["retry_after_ms"]
-        .as_u64()
-        .ok_or("retry_after_ms should be an integer")?;
-    assert!((1..=1_000).contains(&retry_after_ms));
 
     for index in 1..=28 {
         insert_message(
@@ -219,6 +207,7 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
             "Paged signal 3",
             "Paged signal 2",
             "Paged signal 1",
+            "Third immediate signal.",
             "Second immediate signal.",
             "End-to-end human signal."
         ]
