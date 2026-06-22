@@ -2,6 +2,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
   type MouseEvent,
   type ReactNode,
@@ -310,17 +311,8 @@ function NetworkPage() {
         </section>
         <section
           className="tlhn-network-section tlhn-network-composer-section"
-          aria-labelledby="network-composer-title"
+          aria-label="Network message composer"
         >
-          <div className="tlhn-network-section-heading">
-            <p className="tlhn-network-kicker">Signal composer</p>
-            <h2
-              id="network-composer-title"
-              className="tlhn-network-section-title tlhn-network-section-title-compact"
-            >
-              Broadcast to the network
-            </h2>
-          </div>
           {identity ? (
             <MessageComposer
               accent={identity.faction === "ai_haters" ? "hater" : "lover"}
@@ -941,11 +933,26 @@ interface MessageComposerProps {
 
 function MessageComposer({ accent, identity, onMessageCreated }: MessageComposerProps) {
   const [body, setBody] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [submitState, setSubmitState] = useState<{
     errorMessage?: string;
     status: "idle" | "submitting" | "error" | "rate-limited";
   }>({ status: "idle" });
   const isSubmitting = submitState.status === "submitting";
+
+  const resizeMessageInput = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) {
+      return;
+    }
+
+    textarea.style.height = "auto";
+    textarea.style.height = `${textarea.scrollHeight}px`;
+  };
+
+  useEffect(() => {
+    resizeMessageInput();
+  }, [body]);
 
   useEffect(() => {
     if (submitState.status !== "rate-limited") {
@@ -958,6 +965,10 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
 
     return () => window.clearTimeout(timeoutId);
   }, [submitState.status]);
+
+  const handleBodyChange = (event: ChangeEvent<HTMLTextAreaElement>) => {
+    setBody(event.target.value);
+  };
 
   const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -1037,14 +1048,15 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
         {identity.displayName}
       </label>
       <div className="tlhn-message-composer-row">
-        <input
+        <textarea
           className="tlhn-message-input"
           disabled={isSubmitting}
           id={`${identity.faction}-message`}
           maxLength={1000}
-          onChange={(event) => setBody(event.target.value)}
+          onChange={handleBodyChange}
           placeholder="Type your message…"
-          type="text"
+          ref={textareaRef}
+          rows={2}
           value={body}
         />
         <button
