@@ -1,18 +1,20 @@
-Architecture plan for Issue #149: Show the two faction tally boxes side-by-side in one row on phone
+Architecture plan for Issue #151: Remove welcome-email sending from the subscription flow
 
-Repository shape:
-- Monorepo with a Vite/React frontend in frontend/, Rust Axum backend in backend/, and shared TypeScript DTO/contracts in shared/.
-- This issue is purely presentational and should be implemented in the frontend styling layer, primarily frontend/src/styles.css. The React markup in frontend/src/App.tsx already renders the Live Faction Tallies section with a shared .tlhn-network-tally-grid wrapper and two FactionTallyDisplay cards.
-- No backend API, database, or shared DTO changes are expected. Faction counts continue to be fetched from GET /api/factions/counts and typed by shared/src/factions.ts.
+Current structure:
+- backend/: Rust Axum API server with route modules under backend/src/routes, application wiring in backend/src/app.rs, configuration in backend/src/config.rs, SQLx/PostgreSQL persistence in backend/src/db.rs, and currently email plumbing in backend/src/email.rs.
+- frontend/: Vite/React SPA. Subscription UI posts to POST /api/subscriptions and expects the existing success/duplicate/error response shape.
+- shared/: TypeScript constants and DTO contracts, including subscription request/response types.
 
-Issue dependency analysis:
-- There is only one issue in this batch: #149.
-- It has no dependencies and can be implemented independently.
-- It builds on the existing responsive network layout and tally card CSS from prior mobile layout work.
+Issue dependency plan:
+- There is only one implementation issue, so no cross-issue dependency ordering is required.
+- Backend subscription persistence and response behavior must remain unchanged: new subscriptions return 201 with already_subscribed=false; duplicates return 200 with already_subscribed=true.
+- Frontend and shared DTOs should not need changes unless backend response contracts change, which this issue explicitly says not to do.
 
-Key design decisions:
-- Keep the desktop/tablet layout unchanged while making the base/mobile .tlhn-network-tally-grid use two columns instead of stacked cards.
-- Prefer a CSS-only change: set the tally grid to two equal columns at base width, preserving existing gap and any sm:/desktop overrides unless they need slight adjustment.
-- If the cards are too wide on narrow phones, tighten internal mobile-only spacing, min-height, label size, and count size in the existing tally-card selectors rather than changing API data or component structure.
-- Preserve accessibility and semantic markup: the section heading and two faction cards remain unchanged in React.
-- Validate with frontend build/typecheck/lint where available. Rust backend behavior is unaffected.
+Design decisions:
+- Remove email side effects from the subscription route by deleting the send_welcome_email import/call in backend/src/routes/subscriptions.rs.
+- Remove email_client from AppDependencies and constructor wiring in backend/src/app.rs because no route will need it.
+- Remove the email module export and backend/src/email.rs once unused.
+- Remove email-related runtime config fields from backend/src/config.rs if they are only used by the deleted email client; keep unrelated app config intact.
+- Drop reqwest from backend/Cargo.toml if no other backend module uses it.
+- Update docs/environment notes to stop advertising welcome-email delivery if they become stale.
+- Validate with cargo test, npm typecheck/build where feasible.
