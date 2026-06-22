@@ -25,7 +25,6 @@ import type {
   MessagePostRateLimitResponse,
   MessageResponse,
 } from "@tlhn/shared/messages";
-import { MESSAGE_POST_COOLDOWN_MS } from "@tlhn/shared/messages";
 import type { SubscriptionResponse } from "@tlhn/shared/subscriptions";
 import { clientConfig } from "./config";
 
@@ -942,34 +941,11 @@ interface MessageComposerProps {
 
 function MessageComposer({ accent, identity, onMessageCreated }: MessageComposerProps) {
   const [body, setBody] = useState("");
-  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  const [cooldownNow, setCooldownNow] = useState(() => Date.now());
   const [submitState, setSubmitState] = useState<{
     errorMessage?: string;
     status: "idle" | "submitting" | "error" | "rate-limited";
   }>({ status: "idle" });
   const isSubmitting = submitState.status === "submitting";
-  const cooldownRemainingMs = Math.max(0, (cooldownUntil ?? 0) - cooldownNow);
-  const cooldownRemainingSeconds = Math.ceil(cooldownRemainingMs / 1000);
-  const isCoolingDown = cooldownRemainingSeconds > 0;
-
-  useEffect(() => {
-    if (!cooldownUntil) {
-      return undefined;
-    }
-
-    setCooldownNow(Date.now());
-    const intervalId = window.setInterval(() => {
-      const nextNow = Date.now();
-      setCooldownNow(nextNow);
-
-      if (nextNow >= cooldownUntil) {
-        setCooldownUntil(null);
-      }
-    }, 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [cooldownUntil]);
 
   useEffect(() => {
     if (submitState.status !== "rate-limited") {
@@ -985,10 +961,6 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
 
   const submitMessage = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-
-    if (isCoolingDown) {
-      return;
-    }
 
     const trimmedBody = body.trim();
     if (!trimmedBody) {
@@ -1043,8 +1015,6 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
       }
 
       setBody("");
-      setCooldownUntil(Date.now() + MESSAGE_POST_COOLDOWN_MS);
-      setCooldownNow(Date.now());
       setSubmitState({ status: "idle" });
       onMessageCreated();
     } catch (error) {
@@ -1079,17 +1049,12 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
         />
         <button
           className="tlhn-message-post-button"
-          disabled={isSubmitting || isCoolingDown}
+          disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? "POSTING" : isCoolingDown ? "COOLDOWN" : "POST"}
+          {isSubmitting ? "POSTING" : "POST"}
         </button>
       </div>
-      {isCoolingDown && (
-        <p className="tlhn-message-cooldown" role="status">
-          Cooldown: {cooldownRemainingSeconds}s
-        </p>
-      )}
       {submitState.status === "error" && (
         <p className="tlhn-message-composer-error" role="alert">
           {submitState.errorMessage}
