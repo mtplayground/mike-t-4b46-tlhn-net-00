@@ -348,7 +348,7 @@
   }
 
   .tlhn-faction-tally {
-    @apply relative z-10 mt-0 grid min-h-24 overflow-hidden rounded-xl border bg-tlhn-void/75 p-3 text-left font-terminal shadow-panel-glitch sm:min-h-32 sm:p-5;
+    @apply relative z-10 mt-0 grid min-h-24 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 overflow-hidden rounded-xl border bg-tlhn-void/75 p-3 text-left font-terminal shadow-panel-glitch sm:min-h-32 sm:gap-5 sm:p-5;
   }
 
   .tlhn-faction-tally::before {
@@ -376,7 +376,7 @@
   }
 
   .tlhn-faction-tally-copy {
-    @apply relative z-10 grid gap-1 self-start sm:gap-2;
+    @apply relative z-10 grid min-w-0 gap-1 self-center sm:gap-2;
   }
 
   .tlhn-faction-tally-label {
@@ -388,7 +388,7 @@
   }
 
   .tlhn-faction-tally-value {
-    @apply relative z-10 mt-2 block self-end text-right text-4xl font-black leading-none sm:mt-4 sm:text-6xl lg:text-7xl;
+    @apply relative z-10 m-0 block min-w-[3ch] self-center justify-self-center text-center text-4xl font-black leading-none sm:text-6xl lg:text-7xl;
     font-variant-numeric: tabular-nums;
   }
 
