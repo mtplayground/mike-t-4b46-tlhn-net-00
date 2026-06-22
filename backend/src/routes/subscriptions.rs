@@ -1,4 +1,4 @@
-use crate::{app::AppDependencies, email::send_welcome_email};
+use crate::app::AppDependencies;
 use axum::{
     extract::{rejection::JsonRejection, State},
     http::StatusCode,
@@ -51,16 +51,6 @@ pub async fn create(
 
     match insert_subscription(&state, &email).await {
         Ok(created) => {
-            if created {
-                if let Err(error) = send_welcome_email(state.email_client.as_ref(), &email).await {
-                    tracing::error!(
-                        name = "EmailError",
-                        message = %error,
-                        recipient = %email,
-                        "Welcome email send failed after new subscription"
-                    );
-                }
-            }
             let status = if created {
                 StatusCode::CREATED
             } else {

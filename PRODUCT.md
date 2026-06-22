@@ -86,9 +86,8 @@ PostgreSQL-backed state in a monorepo.
 - Persistent state is PostgreSQL only via `sqlx`; SQLite, JSON-file persistence,
   in-memory production storage, and Fly volumes are not part of this project.
 - Database-backed features include messages, faction counts, and subscriptions.
-- Backend dependencies include a server-side email client for welcome-message
-  delivery. It uses platform email env vars when configured and otherwise logs a
-  no-op; subscription persistence remains independent from email delivery.
+- Subscription persistence is handled by PostgreSQL; subscribing no longer sends
+  server-side welcome email.
 - `/api/health` reports API, product, and PostgreSQL health and returns `503`
   when the database check fails.
 - Startup logging emits an INFO-only deployment separator so verifier log tails
@@ -124,9 +123,8 @@ PostgreSQL-backed state in a monorepo.
 - Client build-time config uses `VITE_POLLING_INTERVAL_MS` and
   `VITE_COUNTDOWN_DEADLINE_ISO`; server runtime config uses `POLLING_INTERVAL_MS`
   and `COUNTDOWN_DEADLINE_ISO`.
-- Server email config uses `MCTAI_EMAIL_URL`, `MCTAI_EMAIL_APP_TOKEN`, and
-  optional `NEWSLETTER_FROM_EMAIL`; `RESEND_API_KEY` is retained only as legacy
-  compatibility config and is not used for direct provider calls.
+- The subscription flow stores email addresses only; no welcome-email provider
+  configuration is required by the Rust backend.
 - Production requires `DATABASE_URL`; zeroclaw/Fly injects it via
   `.env.production`.
 
