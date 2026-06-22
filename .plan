@@ -1,20 +1,20 @@
-Architecture plan for Issue #151: Remove welcome-email sending from the subscription flow
+Architecture plan for Issue #153: Remove composer headings/outer box and make the input an auto-resizing textarea
 
 Current structure:
-- backend/: Rust Axum API server with route modules under backend/src/routes, application wiring in backend/src/app.rs, configuration in backend/src/config.rs, SQLx/PostgreSQL persistence in backend/src/db.rs, and currently email plumbing in backend/src/email.rs.
-- frontend/: Vite/React SPA. Subscription UI posts to POST /api/subscriptions and expects the existing success/duplicate/error response shape.
-- shared/: TypeScript constants and DTO contracts, including subscription request/response types.
+- frontend/src/App.tsx contains the NetworkPage composition, including the network composer section and the MessageComposer React component.
+- frontend/src/styles.css contains the Tailwind @apply component classes for the network layout and message composer presentation.
+- shared/src/messages.ts defines message DTOs; no schema or shared type changes are expected for this UI-only issue.
+- backend/ exposes the existing /api/messages endpoint; no backend changes are needed because message posting semantics remain unchanged.
 
 Issue dependency plan:
-- There is only one implementation issue, so no cross-issue dependency ordering is required.
-- Backend subscription persistence and response behavior must remain unchanged: new subscriptions return 201 with already_subscribed=false; duplicates return 200 with already_subscribed=true.
-- Frontend and shared DTOs should not need changes unless backend response contracts change, which this issue explicitly says not to do.
+- There is only one implementation issue in this batch, so there are no cross-issue dependencies.
+- The change should preserve the existing MessageComposer state, validation, rate-limit handling, POST /api/messages payload, success callback, and disabled behavior.
+- The network composer section title ID will be removed with its visible heading, so the section should use aria-label="Network message composer" instead of aria-labelledby.
 
-Design decisions:
-- Remove email side effects from the subscription route by deleting the send_welcome_email import/call in backend/src/routes/subscriptions.rs.
-- Remove email_client from AppDependencies and constructor wiring in backend/src/app.rs because no route will need it.
-- Remove the email module export and backend/src/email.rs once unused.
-- Remove email-related runtime config fields from backend/src/config.rs if they are only used by the deleted email client; keep unrelated app config intact.
-- Drop reqwest from backend/Cargo.toml if no other backend module uses it.
-- Update docs/environment notes to stop advertising welcome-email delivery if they become stale.
-- Validate with cargo test, npm typecheck/build where feasible.
+Key design decisions:
+- In frontend/src/App.tsx, remove the composer heading block containing the "Signal composer" kicker and "Broadcast to the network" title from NetworkPage.
+- Replace the single-line <input> in MessageComposer with a <textarea rows={2}> so user text can span multiple lines while retaining maxLength, disabled, placeholder, id, value, and submit behavior.
+- Add a textarea ref plus a small resize helper that sets height to auto and then to scrollHeight whenever the message body changes. This lets the field grow and shrink automatically as content is typed or cleared.
+- In frontend/src/styles.css, strip the outer panel treatment from .tlhn-message-composer by removing border/background/padding/shadow styling and neutralizing the hater/lover border variants.
+- Update .tlhn-message-input styling for textarea ergonomics: at least two rows high, vertical padding, leading, hidden overflow, and no manual resize handle, while retaining focus accents and disabled styles.
+- Verify with the frontend typecheck/build and any available test command after implementation.
