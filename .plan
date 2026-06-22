@@ -1,23 +1,18 @@
-Architecture plan for Issue #147: Re-enable backend message post rate limiter at 3 posts/second
+Architecture plan for Issue #149: Show the two faction tally boxes side-by-side in one row on phone
 
 Repository shape:
-- Monorepo with Rust Axum backend in backend/, React/Vite frontend in frontend/, and shared TypeScript DTO/contracts in shared/.
-- Backend route modules live under backend/src/routes/. Message posting and rate-limiting behavior is localized to backend/src/routes/messages.rs.
-- App wiring and shared dependencies are in backend/src/app.rs. AppDependencies owns an Arc<Mutex<MessagePostRateLimiter>> used by the messages create handler.
-- PostgreSQL persistence remains unchanged for this issue; no migration is needed.
-- Frontend behavior and shared TypeScript types should not need changes unless API response shape changes, which this issue does not require.
+- Monorepo with a Vite/React frontend in frontend/, Rust Axum backend in backend/, and shared TypeScript DTO/contracts in shared/.
+- This issue is purely presentational and should be implemented in the frontend styling layer, primarily frontend/src/styles.css. The React markup in frontend/src/App.tsx already renders the Live Faction Tallies section with a shared .tlhn-network-tally-grid wrapper and two FactionTallyDisplay cards.
+- No backend API, database, or shared DTO changes are expected. Faction counts continue to be fetched from GET /api/factions/counts and typed by shared/src/factions.ts.
 
 Issue dependency analysis:
-- There is only one issue in this batch: #147.
-- It is independent and can be implemented directly.
-- The issue explicitly reverses a prior temporary disable from Issue 2.11, so the implementation should inspect current create() logic and restore the existing limiter reservation/denial flow rather than designing a new rate limiter.
+- There is only one issue in this batch: #149.
+- It has no dependencies and can be implemented independently.
+- It builds on the existing responsive network layout and tally card CSS from prior mobile layout work.
 
 Key design decisions:
-- Keep the existing one-second window constant: MESSAGE_POST_FREQUENCY_LIMIT_WINDOW_MS = 1000.
-- Set MESSAGE_POST_FREQUENCY_LIMIT_MAX_MESSAGES to 3.
-- In backend/src/routes/messages.rs create(), validate JSON and message payload first, then run the rate-limit reservation before inserting into PostgreSQL.
-- If limiter denies, return HTTP 429 with Retry-After: 1 and existing retry metadata JSON.
-- If DB insert fails after a successful reservation, release that reservation to avoid false throttling.
-- Rate-limit keying should continue to use the existing client key helper, preserving proxy/header behavior already in the codebase.
-- Update Rust unit tests for MessagePostRateLimiter so three reservations inside the one-second window are allowed and the fourth is denied.
-- Validation target: cargo test --manifest-path backend/Cargo.toml. Full repo validation remains npm test if Node dependencies are available.
+- Keep the desktop/tablet layout unchanged while making the base/mobile .tlhn-network-tally-grid use two columns instead of stacked cards.
+- Prefer a CSS-only change: set the tally grid to two equal columns at base width, preserving existing gap and any sm:/desktop overrides unless they need slight adjustment.
+- If the cards are too wide on narrow phones, tighten internal mobile-only spacing, min-height, label size, and count size in the existing tally-card selectors rather than changing API data or component structure.
+- Preserve accessibility and semantic markup: the section heading and two faction cards remain unchanged in React.
+- Validate with frontend build/typecheck/lint where available. Rust backend behavior is unaffected.
