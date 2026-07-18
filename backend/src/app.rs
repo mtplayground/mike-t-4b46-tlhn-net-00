@@ -1,6 +1,7 @@
 use crate::{
+    auth::{production_session_verifier, SharedSessionVerifier},
     config::ServerConfig,
-    routes::{factions, health::health, messages, subscriptions},
+    routes::{auth, factions, health::health, messages, subscriptions},
 };
 use axum::{
     http::{header, HeaderValue, StatusCode},
@@ -28,14 +29,17 @@ use tower_http::{
 pub struct AppDependencies {
     pub config: Arc<ServerConfig>,
     pub db_pool: PgPool,
+    pub auth_verifier: SharedSessionVerifier,
     pub message_post_rate_limiter: Arc<Mutex<messages::MessagePostRateLimiter>>,
 }
 
 impl AppDependencies {
     pub fn new(config: ServerConfig, db_pool: PgPool) -> Self {
+        let auth_verifier = production_session_verifier(&config);
         Self {
             config: Arc::new(config),
             db_pool,
+            auth_verifier,
             message_post_rate_limiter: Arc::new(Mutex::new(
                 messages::MessagePostRateLimiter::default(),
             )),
@@ -60,6 +64,8 @@ pub fn create_app(dependencies: AppDependencies) -> Router {
 
     Router::new()
         .route("/api/health", get(health))
+        .route("/api/auth/session", get(auth::session))
+        .route("/api/auth/login", get(auth::login))
         .route("/api/factions/counts", get(factions::counts))
         .route("/api/messages", get(messages::list).post(messages::create))
         .route(

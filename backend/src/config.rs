@@ -16,6 +16,15 @@ pub struct ServerConfig {
     pub node_env: String,
     pub polling_interval_ms: u64,
     pub countdown_deadline_iso: String,
+    pub public_base_url: Option<String>,
+    pub platform_auth: Option<PlatformAuthConfig>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct PlatformAuthConfig {
+    pub auth_url: String,
+    pub app_token: String,
+    pub jwks_url: String,
 }
 
 #[derive(Debug, Error)]
@@ -53,7 +62,31 @@ impl ServerConfig {
                 "COUNTDOWN_DEADLINE_ISO",
                 DEFAULT_COUNTDOWN_DEADLINE_ISO,
             )?,
+            public_base_url: read_env("SELF_URL").filter(|value| !value.trim().is_empty()),
+            platform_auth: parse_platform_auth_config(&read_env)?,
         })
+    }
+}
+
+fn parse_platform_auth_config(
+    read_env: &impl Fn(&str) -> Option<String>,
+) -> Result<Option<PlatformAuthConfig>, ConfigError> {
+    let auth_url = read_env("MCTAI_AUTH_URL").filter(|value| !value.trim().is_empty());
+    let app_token = read_env("MCTAI_AUTH_APP_TOKEN").filter(|value| !value.trim().is_empty());
+    let jwks_url = read_env("MCTAI_AUTH_JWKS_URL").filter(|value| !value.trim().is_empty());
+
+    match (auth_url, app_token, jwks_url) {
+        (None, None, None) => Ok(None),
+        (Some(auth_url), Some(app_token), Some(jwks_url)) => Ok(Some(PlatformAuthConfig {
+            auth_url: normalize_http_url(&auth_url, "MCTAI_AUTH_URL")?,
+            app_token,
+            jwks_url: normalize_http_url(&jwks_url, "MCTAI_AUTH_JWKS_URL")?,
+        })),
+        _ => Err(ConfigError::InvalidValue {
+            name: "MCTAI_AUTH_*",
+            value: "MCTAI_AUTH_URL, MCTAI_AUTH_APP_TOKEN, and MCTAI_AUTH_JWKS_URL must be set together"
+                .to_owned(),
+        }),
     }
 }
 
@@ -120,6 +153,21 @@ fn normalize_database_url(value: &str) -> Result<String, ConfigError> {
     Ok(url.to_string())
 }
 
+fn normalize_http_url(value: &str, name: &'static str) -> Result<String, ConfigError> {
+    let url = Url::parse(value).map_err(|_| ConfigError::InvalidValue {
+        name,
+        value: value.to_owned(),
+    })?;
+
+    match url.scheme() {
+        "http" | "https" => Ok(url.to_string().trim_end_matches('/').to_owned()),
+        _ => Err(ConfigError::InvalidValue {
+            name,
+            value: value.to_owned(),
+        }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,7 +193,51 @@ mod tests {
             config.countdown_deadline_iso,
             DEFAULT_COUNTDOWN_DEADLINE_ISO
         );
+        assert_eq!(config.public_base_url, None);
+        assert_eq!(config.platform_auth, None);
         assert!(config.database_url.contains("sslmode=require"));
+    }
+
+    #[test]
+    fn reads_platform_auth_config_when_all_values_are_present() {
+        let config = config_from(&[
+            ("DATABASE_URL", "postgresql://example.test/db"),
+            ("SELF_URL", "https://tlhn.example.test"),
+            ("MCTAI_AUTH_URL", "https://auth.mctai.app/"),
+            ("MCTAI_AUTH_APP_TOKEN", "app_test"),
+            (
+                "MCTAI_AUTH_JWKS_URL",
+                "https://auth.mctai.app/.well-known/jwks.json",
+            ),
+        ])
+        .expect("config should parse");
+
+        assert_eq!(
+            config.platform_auth,
+            Some(PlatformAuthConfig {
+                auth_url: "https://auth.mctai.app".to_owned(),
+                app_token: "app_test".to_owned(),
+                jwks_url: "https://auth.mctai.app/.well-known/jwks.json".to_owned(),
+            })
+        );
+        assert_eq!(
+            config.public_base_url,
+            Some("https://tlhn.example.test".to_owned())
+        );
+    }
+
+    #[test]
+    fn rejects_partial_platform_auth_config() {
+        assert!(matches!(
+            config_from(&[
+                ("DATABASE_URL", "postgresql://example.test/db"),
+                ("MCTAI_AUTH_URL", "https://auth.mctai.app"),
+            ]),
+            Err(ConfigError::InvalidValue {
+                name: "MCTAI_AUTH_*",
+                ..
+            })
+        ));
     }
 
     #[test]
