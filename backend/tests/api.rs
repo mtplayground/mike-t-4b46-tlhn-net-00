@@ -17,6 +17,7 @@ use std::{
 };
 use tlhn_backend::{
     app::{create_app, AppDependencies},
+    auth::{AuthSession, StaticSessionVerifier},
     config::ServerConfig,
     routes::messages::MessagePostRateLimiter,
 };
@@ -36,6 +37,53 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert_eq!(health.json["status"], "ok");
     assert_eq!(health.json["product"], "The Last Human Network");
     assert_eq!(health.json["database"]["status"], "ok");
+
+    let unauthenticated_session =
+        request_json(&mut app, Method::GET, "/api/auth/session", None, &[]).await?;
+    assert_eq!(unauthenticated_session.status, StatusCode::OK);
+    assert_eq!(
+        unauthenticated_session.json,
+        json!({"authenticated": false})
+    );
+
+    let mut authenticated_app =
+        build_app_with_auth_session(&postgres.database_url(), Some(test_auth_session())).await?;
+    let authenticated_session =
+        request_json(&mut authenticated_app, Method::GET, "/api/auth/session", None, &[]).await?;
+    assert_eq!(authenticated_session.status, StatusCode::OK);
+    assert_eq!(
+        authenticated_session.json,
+        json!({
+            "authenticated": true,
+            "user": {
+                "sub": "platform-user-1",
+                "email": "human@example.test",
+                "email_verified": true,
+                "name": "TLHN Human",
+                "picture": "https://cdn.example.test/avatar.png"
+            }
+        })
+    );
+
+    let mut login_app = build_app_with_platform_auth(&postgres.database_url()).await?;
+    let login = request_json(
+        &mut login_app,
+        Method::GET,
+        "/api/auth/login",
+        None,
+        &[
+            ("x-forwarded-proto", "https"),
+            ("x-forwarded-host", "tlhn-public.mctai.app"),
+        ],
+    )
+    .await?;
+    assert_eq!(login.status, StatusCode::OK);
+    let login_url = login.json["login_url"]
+        .as_str()
+        .ok_or("missing login_url")?;
+    assert!(login_url.starts_with("https://auth.mctai.app/login?"));
+    assert!(login_url.contains("app_token=app_test"));
+    assert!(login_url.contains("return_to=https%3A%2F%2Ftlhn-public.mctai.app"));
 
     let initial_counts =
         request_json(&mut app, Method::GET, "/api/factions/counts", None, &[]).await?;
@@ -170,15 +218,15 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
             .headers
             .get(header::RETRY_AFTER)
             .and_then(|value| value.to_str().ok()),
-        Some("1")
+        Some("5")
     );
     assert_eq!(
         fourth_immediate_message.json["retry_after_seconds"],
-        json!(1)
+        json!(5)
     );
     assert!(fourth_immediate_message.json["retry_after_ms"]
         .as_u64()
-        .is_some_and(|retry_after_ms| (1..=1_000).contains(&retry_after_ms)));
+        .is_some_and(|retry_after_ms| (1..=5_000).contains(&retry_after_ms)));
     assert!(fourth_immediate_message.json["next_allowed_at"].is_string());
 
     for index in 1..=28 {
@@ -305,8 +353,71 @@ async fn build_app(database_url: &str) -> Result<Router, Box<dyn std::error::Err
     Ok(create_app(AppDependencies {
         config: Arc::new(config),
         db_pool: pool,
+        auth_verifier: Arc::new(StaticSessionVerifier::unauthenticated()),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 5_000))),
+    }))
+}
+
+async fn build_app_with_auth_session(
+    database_url: &str,
+    session: Option<AuthSession>,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    let config = ServerConfig::from_env_reader(|name| match name {
+        "DATABASE_URL" => Some(database_url.to_owned()),
+        "HOST" => Some("127.0.0.1".to_owned()),
+        "PORT" => Some("8080".to_owned()),
+        _ => None,
+    })?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await?;
+    let auth_verifier = match session {
+        Some(session) => StaticSessionVerifier::authenticated(session),
+        None => StaticSessionVerifier::unauthenticated(),
+    };
+    Ok(create_app(AppDependencies {
+        config: Arc::new(config),
+        db_pool: pool,
+        auth_verifier: Arc::new(auth_verifier),
         message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 1_000))),
     }))
+}
+
+async fn build_app_with_platform_auth(
+    database_url: &str,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    let config = ServerConfig::from_env_reader(|name| match name {
+        "DATABASE_URL" => Some(database_url.to_owned()),
+        "HOST" => Some("127.0.0.1".to_owned()),
+        "PORT" => Some("8080".to_owned()),
+        "MCTAI_AUTH_URL" => Some("https://auth.mctai.app".to_owned()),
+        "MCTAI_AUTH_APP_TOKEN" => Some("app_test".to_owned()),
+        "MCTAI_AUTH_JWKS_URL" => {
+            Some("https://auth.mctai.app/.well-known/jwks.json".to_owned())
+        }
+        _ => None,
+    })?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await?;
+    Ok(create_app(AppDependencies {
+        config: Arc::new(config),
+        db_pool: pool,
+        auth_verifier: Arc::new(StaticSessionVerifier::unauthenticated()),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 1_000))),
+    }))
+}
+
+fn test_auth_session() -> AuthSession {
+    AuthSession {
+        sub: "platform-user-1".to_owned(),
+        email: Some("human@example.test".to_owned()),
+        email_verified: Some(true),
+        name: Some("TLHN Human".to_owned()),
+        picture: Some("https://cdn.example.test/avatar.png".to_owned()),
+    }
 }
 
 struct TestResponse {
