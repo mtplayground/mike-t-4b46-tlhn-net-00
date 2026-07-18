@@ -12,6 +12,8 @@ pub const MESSAGES_TABLE: &str = "messages";
 pub const SUBSCRIPTIONS_TABLE: &str = "subscriptions";
 #[allow(dead_code)]
 pub const FACTION_COUNTS_TABLE: &str = "faction_counts";
+#[allow(dead_code)]
+pub const USERS_TABLE: &str = "users";
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -82,4 +84,18 @@ pub struct SubscriptionRow {
 pub struct FactionCountRow {
     pub faction: Faction,
     pub count: i32,
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct UserRow {
+    pub sub: String,
+    pub email: String,
+    pub email_verified: Option<bool>,
+    pub name: Option<String>,
+    pub picture_url: Option<String>,
+    pub faction: Faction,
+    pub pseudonym: String,
+    pub created_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
 }

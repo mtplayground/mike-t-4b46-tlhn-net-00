@@ -1,6 +1,7 @@
 use crate::{
+    accounts::{get_or_create_account_identity, log_account_identity_error, AccountIdentity},
     app::AppDependencies,
-    auth::{platform_login_url, AuthSession},
+    auth::platform_login_url,
 };
 use axum::{
     extract::State,
@@ -20,14 +21,16 @@ pub struct AuthSessionResponse {
 #[derive(Clone, Debug, Serialize)]
 pub struct AuthUserResponse {
     pub sub: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub email: Option<String>,
+    pub email: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub email_verified: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub name: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub picture: Option<String>,
+    pub faction: crate::models::Faction,
+    pub pseudonym: String,
+    pub newly_registered: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -42,11 +45,23 @@ pub struct ErrorResponse {
 
 pub async fn session(State(state): State<AppDependencies>, headers: HeaderMap) -> Response {
     match state.auth_verifier.verify_session(&headers).await {
-        Ok(Some(session)) => Json(AuthSessionResponse {
-            authenticated: true,
-            user: Some(AuthUserResponse::from(session)),
-        })
-        .into_response(),
+        Ok(Some(session)) => match get_or_create_account_identity(&state, &session).await {
+            Ok(account) => Json(AuthSessionResponse {
+                authenticated: true,
+                user: Some(AuthUserResponse::from(account)),
+            })
+            .into_response(),
+            Err(error) => {
+                log_account_identity_error(&error);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    Json(ErrorResponse {
+                        error: "Account identity unavailable",
+                    }),
+                )
+                    .into_response()
+            }
+        },
         Ok(None) => Json(AuthSessionResponse {
             authenticated: false,
             user: None,
@@ -81,14 +96,17 @@ pub async fn login(State(state): State<AppDependencies>, headers: HeaderMap) -> 
     }
 }
 
-impl From<AuthSession> for AuthUserResponse {
-    fn from(session: AuthSession) -> Self {
+impl From<AccountIdentity> for AuthUserResponse {
+    fn from(account: AccountIdentity) -> Self {
         Self {
-            sub: session.sub,
-            email: session.email,
-            email_verified: session.email_verified,
-            name: session.name,
-            picture: session.picture,
+            sub: account.sub,
+            email: account.email,
+            email_verified: account.email_verified,
+            name: account.name,
+            picture: account.picture_url,
+            faction: account.faction,
+            pseudonym: account.pseudonym,
+            newly_registered: account.newly_registered,
         }
     }
 }
