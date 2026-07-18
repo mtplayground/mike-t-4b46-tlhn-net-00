@@ -1,20 +1,45 @@
-Architecture plan for Issue #153: Remove composer headings/outer box and make the input an auto-resizing textarea
+Architecture plan for Issues #155-#158: platform auth, user identity, posting gate, and frontend auth UX
 
-Current structure:
-- frontend/src/App.tsx contains the NetworkPage composition, including the network composer section and the MessageComposer React component.
-- frontend/src/styles.css contains the Tailwind @apply component classes for the network layout and message composer presentation.
-- shared/src/messages.ts defines message DTOs; no schema or shared type changes are expected for this UI-only issue.
-- backend/ exposes the existing /api/messages endpoint; no backend changes are needed because message posting semantics remain unchanged.
+Current repository shape:
+- Product brand is The Last Human Network / TLHN, defined in shared/src/index.ts and mirrored in backend/src/models.rs.
+- backend/ is a Rust Axum API server that serves frontend/dist and /api/* routes from PostgreSQL via sqlx.
+- frontend/ is a Vite React SPA with the network page, faction selection, combined feed, and message composer in frontend/src/App.tsx.
+- shared/ contains TypeScript DTOs and Zod schemas for factions, messages, subscriptions, and product constants.
+- backend/drizzle/ holds plain SQL migrations; backend/tests/api.rs starts PostgreSQL, applies migrations, and covers the API flow.
+
+Module structure and file organization:
+- Add backend/src/auth.rs for platform-session verification:
+  - cookie/header extraction for the platform session token.
+  - trusted request origin helpers that use X-Forwarded-Host / X-Forwarded-Proto or ALLOWED_CORS_ORIGIN when same-origin decisions are needed.
+  - an AuthIdentity struct with stable platform user id and optional profile fields returned by the platform auth service.
+  - verifier trait/client so route tests can inject deterministic authenticated/unauthenticated sessions without calling the platform.
+- Add backend/src/routes/auth.rs for auth routes:
+  - GET /api/auth/session returns { authenticated, user? } and creates/loads local account identity when authenticated.
+  - POST /api/auth/sign-out, if supported by the platform cookie flow, clears local app-visible auth state/cookies without inventing app JWTs.
+  - optional sign-in metadata route only if the platform requires a backend-provided login URL.
+- Extend backend/src/app.rs AppDependencies with an auth verifier/client and register /api/auth routes before the API not-found route.
+- Add backend/src/accounts.rs or backend/src/users.rs for user persistence:
+  - get_or_create_user_by_platform_id(platform_user_id) wraps user lookup, pseudonym/faction assignment, and race-safe upsert logic.
+  - shared pseudonym generation should reuse the existing Faction display_name_prefixes pattern where possible.
+- Add a new SQL migration backend/drizzle/0002_create_users.sql and update the migration runner/test helper when issue #156 is implemented.
+- Extend backend/src/models.rs with USERS_TABLE, UserRow, and any account-facing DTO helpers that are reused by routes.
+- Extend shared/src with auth/account DTOs:
+  - shared/src/auth.ts for AuthSessionResponse, AuthenticatedUser, SignInMetadata if needed.
+  - update shared/src/messages.ts so CreateMessageRequest contains only body once posting identity is server-derived.
+- Keep frontend/src/App.tsx as the first implementation point unless the auth UI grows enough to justify splitting into frontend/src/auth.ts and small components.
 
 Issue dependency plan:
-- There is only one implementation issue in this batch, so there are no cross-issue dependencies.
-- The change should preserve the existing MessageComposer state, validation, rate-limit handling, POST /api/messages payload, success callback, and disabled behavior.
-- The network composer section title ID will be removed with its visible heading, so the section should use aria-label="Network message composer" instead of aria-labelledby.
+- #155 is the backend foundation. It should introduce verification, auth routes, config/env, tests for valid/invalid/missing platform sessions, and no custom JWT or raw Google OAuth flow.
+- #156 depends on #155's verified platform identity. It adds the users table and local account identity keyed by platform_user_id, with stable pseudonym and faction.
+- #157 depends on #155 and #156. It changes POST /api/messages to require auth, derive faction/display_name/user from the authenticated local user, and leave GET /api/messages public.
+- #158 depends on #155-#157 route contracts. It loads /api/auth/session, adds sign-in UX, keeps the feed readable while logged out, and disables/replaces the composer until authenticated.
 
 Key design decisions:
-- In frontend/src/App.tsx, remove the composer heading block containing the "Signal composer" kicker and "Broadcast to the network" title from NetworkPage.
-- Replace the single-line <input> in MessageComposer with a <textarea rows={2}> so user text can span multiple lines while retaining maxLength, disabled, placeholder, id, value, and submit behavior.
-- Add a textarea ref plus a small resize helper that sets height to auto and then to scrollHeight whenever the message body changes. This lets the field grow and shrink automatically as content is typed or cleared.
-- In frontend/src/styles.css, strip the outer panel treatment from .tlhn-message-composer by removing border/background/padding/shadow styling and neutralizing the hater/lover border variants.
-- Update .tlhn-message-input styling for textarea ergonomics: at least two rows high, vertical padding, leading, hidden overflow, and no manual resize handle, while retaining focus accents and disabled styles.
-- Verify with the frontend typecheck/build and any available test command after implementation.
+- The app must trust the platform session only. Do not create app JWTs, do not store raw OAuth tokens, and do not add a separate Google OAuth flow.
+- Local users are application identity records, not authentication credentials. The canonical key is the platform identity; TLHN-owned fields are pseudonym, faction, timestamps, and optional display-safe metadata.
+- Faction/display name should become server-owned for posting. The current client localStorage identity and /api/factions/:faction/join cookie flow should either be retired or bridged during #156/#158 so the backend remains the source of truth.
+- Message posting should rate-limit by authenticated platform/local user id when available, not just IP. Missing/invalid sessions should return 401 with a stable JSON error.
+- Message reads stay public and unchanged in shape unless adding user/account fields is required; this preserves the logged-out feed experience.
+- CORS/same-origin logic must remain compatible with the Ideavibes reverse proxy: use X-Forwarded-Host/X-Forwarded-Proto or ALLOWED_CORS_ORIGIN, never raw Host alone.
+- Integration tests should keep using an injected auth verifier rather than external network calls. Add focused unit tests for cookie/header parsing, origin helpers, user upsert behavior, and create-message auth gating.
+- Frontend auth state should be explicit: loading, authenticated, unauthenticated, and error. Composer gating should prevent submission client-side, but the backend remains the authority.
