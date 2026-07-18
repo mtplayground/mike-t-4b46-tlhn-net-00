@@ -14,11 +14,7 @@ import {
   PRODUCT_SHORT_NAME,
   type Faction,
 } from "@tlhn/shared";
-import type {
-  FactionCounts,
-  FactionCountsResponse,
-  FactionJoinResponse,
-} from "@tlhn/shared/factions";
+import type { FactionCounts, FactionCountsResponse } from "@tlhn/shared/factions";
 import type {
   CreateMessageResponse,
   ListMessagesResponse,
@@ -48,7 +44,6 @@ const HUMAN_COLLAPSE_STORY_LINES = [
   `Welcome to ${PRODUCT_NAME}.`,
 ] as const;
 
-const NETWORK_IDENTITY_STORAGE_KEY = "tlhn_network_identity";
 const DISPLAY_NAME_PATTERN = /^[a-z][a-z0-9]*_[a-z0-9]{5}$/;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const CHAT_PAGE_SIZE = 25;
@@ -65,6 +60,32 @@ interface NetworkIdentity {
   faction: Faction;
   displayName: string;
 }
+
+interface AuthenticatedUser {
+  sub: string;
+  email: string;
+  email_verified?: boolean;
+  name?: string;
+  picture?: string;
+  faction: Faction;
+  pseudonym: string;
+  newly_registered: boolean;
+}
+
+interface AuthSessionResponse {
+  authenticated: boolean;
+  user?: AuthenticatedUser;
+}
+
+interface AuthLoginResponse {
+  login_url: string;
+}
+
+type AuthState =
+  | { status: "loading" }
+  | { status: "authenticated"; user: AuthenticatedUser }
+  | { status: "unauthenticated" }
+  | { errorMessage: string; status: "error" };
 
 export function App() {
   const [route, setRoute] = useState<RoutePath>(() =>
@@ -189,9 +210,11 @@ function EnterNetworkButton({ onNavigate }: EnterNetworkButtonProps) {
 }
 
 function NetworkPage() {
-  const [identity, setIdentity] = useState<NetworkIdentity | null>(() =>
-    readStoredNetworkIdentity(),
-  );
+  const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [signInState, setSignInState] = useState<{
+    errorMessage?: string;
+    status: "idle" | "loading" | "error";
+  }>({ status: "idle" });
   const [factionCounts, setFactionCounts] =
     useState<FactionCounts>(INITIAL_FACTION_COUNTS);
   const [countsState, setCountsState] = useState<{
@@ -199,10 +222,6 @@ function NetworkPage() {
     status: "loading" | "ready" | "error";
   }>({ status: "loading" });
   const [messageRefreshToken, setMessageRefreshToken] = useState(0);
-  const [joinState, setJoinState] = useState<{
-    errorMessage?: string;
-    status: "idle" | "joining" | "error";
-  }>({ status: "idle" });
 
   useEffect(() => {
     const abortController = new AbortController();
@@ -245,28 +264,66 @@ function NetworkPage() {
     };
   }, []);
 
-  const joinFaction = async (faction: Faction) => {
-    setJoinState({ status: "joining" });
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadAuthSession = async () => {
+      setAuthState({ status: "loading" });
+
+      try {
+        const response = await fetch("/api/auth/session", {
+          credentials: "include",
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`Auth session fetch failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as AuthSessionResponse;
+        if (data.authenticated && isAuthenticatedUser(data.user)) {
+          setAuthState({ status: "authenticated", user: data.user });
+        } else {
+          setAuthState({ status: "unauthenticated" });
+        }
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error("Auth session fetch failed", error);
+          setAuthState({
+            errorMessage:
+              error instanceof Error ? error.message : "Auth session fetch failed",
+            status: "error",
+          });
+        }
+      }
+    };
+
+    void loadAuthSession();
+
+    return () => abortController.abort();
+  }, []);
+
+  const signIn = async () => {
+    setSignInState({ status: "loading" });
 
     try {
-      const response = await fetch(`/api/factions/${faction}/join`, {
+      const response = await fetch("/api/auth/login", {
         credentials: "include",
-        method: "POST",
       });
 
       if (!response.ok) {
-        throw new Error(`Faction join failed with status ${response.status}`);
+        throw new Error(`Sign-in URL fetch failed with status ${response.status}`);
       }
 
-      const data = (await response.json()) as FactionJoinResponse;
-      const nextIdentity = toNetworkIdentity(data);
-      storeNetworkIdentity(nextIdentity);
-      setIdentity(nextIdentity);
-      setFactionCounts(toFactionCounts(data.counts));
-      setJoinState({ status: "idle" });
+      const data = (await response.json()) as AuthLoginResponse;
+      if (!data || typeof data.login_url !== "string" || !data.login_url) {
+        throw new Error("Sign-in response was invalid");
+      }
+
+      window.location.assign(data.login_url);
     } catch (error) {
-      setJoinState({
-        errorMessage: error instanceof Error ? error.message : "Faction join failed",
+      setSignInState({
+        errorMessage: error instanceof Error ? error.message : "Sign-in failed",
         status: "error",
       });
     }
@@ -275,6 +332,10 @@ function NetworkPage() {
   const refreshMessages = () => {
     setMessageRefreshToken((currentToken) => currentToken + 1);
   };
+  const identity =
+    authState.status === "authenticated"
+      ? toNetworkIdentityFromUser(authState.user)
+      : null;
 
   return (
     <>
@@ -320,9 +381,11 @@ function NetworkPage() {
               onMessageCreated={refreshMessages}
             />
           ) : (
-            <p className="tlhn-network-empty-composer" role="status">
-              &gt;_ Choose a faction to unlock the transmission channel.
-            </p>
+            <SignInComposerGate
+              authState={authState}
+              onSignIn={signIn}
+              signInState={signInState}
+            />
           )}
         </section>
         <section
@@ -342,7 +405,7 @@ function NetworkPage() {
             />
             <UtilityLine
               label="Transmission"
-              value={identity ? "Live channel" : "Awaiting faction"}
+              value={identity ? "Live channel" : "Read-only channel"}
             />
           </div>
         </section>
@@ -354,9 +417,6 @@ function NetworkPage() {
         </section>
         <SiteFooter />
       </section>
-      {!identity && (
-        <FactionSelectionModal joinState={joinState} onJoinFaction={joinFaction} />
-      )}
     </>
   );
 }
@@ -925,6 +985,50 @@ function restoreMessageListScrollPosition(
   });
 }
 
+interface SignInComposerGateProps {
+  authState: AuthState;
+  onSignIn: () => void;
+  signInState: {
+    errorMessage?: string;
+    status: "idle" | "loading" | "error";
+  };
+}
+
+function SignInComposerGate({
+  authState,
+  onSignIn,
+  signInState,
+}: SignInComposerGateProps) {
+  const isLoading = authState.status === "loading" || signInState.status === "loading";
+  const statusText =
+    authState.status === "loading"
+      ? "Synchronizing session..."
+      : "Sign in to unlock transmissions.";
+  const errorMessage =
+    authState.status === "error" ? authState.errorMessage : signInState.errorMessage;
+
+  return (
+    <div className="tlhn-auth-gate">
+      <p className="tlhn-auth-gate-status" role="status">
+        &gt;_ {statusText}
+      </p>
+      <button
+        className="tlhn-auth-sign-in-button"
+        disabled={isLoading}
+        onClick={onSignIn}
+        type="button"
+      >
+        {signInState.status === "loading" ? "SIGNING IN" : "SIGN IN"}
+      </button>
+      {errorMessage && (
+        <p className="tlhn-message-composer-error" role="alert">
+          {errorMessage}
+        </p>
+      )}
+    </div>
+  );
+}
+
 interface MessageComposerProps {
   accent: "hater" | "lover";
   identity: NetworkIdentity;
@@ -988,8 +1092,6 @@ function MessageComposer({ accent, identity, onMessageCreated }: MessageComposer
       const response = await fetch("/api/messages", {
         body: JSON.stringify({
           body: trimmedBody,
-          display_name: identity.displayName,
-          faction: identity.faction,
         }),
         credentials: "include",
         headers: {
@@ -1105,125 +1207,27 @@ function getFrequencyLimitMessage(response: MessagePostFrequencyLimitResponse): 
   return `Slow down — message frequency limit active. Try again in ${retryAfterSeconds}s.`;
 }
 
-interface FactionSelectionModalProps {
-  joinState: {
-    errorMessage?: string;
-    status: "idle" | "joining" | "error";
-  };
-  onJoinFaction: (faction: Faction) => void;
-}
+function isAuthenticatedUser(value: unknown): value is AuthenticatedUser {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
 
-function FactionSelectionModal({
-  joinState,
-  onJoinFaction,
-}: FactionSelectionModalProps) {
-  const isJoining = joinState.status === "joining";
-
+  const user = value as Partial<AuthenticatedUser>;
   return (
-    <div className="tlhn-faction-modal-backdrop" role="presentation">
-      <section
-        aria-busy={isJoining}
-        aria-labelledby="faction-modal-title"
-        aria-modal="true"
-        className="tlhn-faction-modal"
-        role="dialog"
-      >
-        <p className="tlhn-network-kicker">Session identity required</p>
-        <h2 id="faction-modal-title" className="tlhn-modal-title">
-          Choose a side
-        </h2>
-        <div className="tlhn-faction-choice-grid">
-          <FactionChoiceButton
-            accent="hater"
-            disabled={isJoining}
-            faction="ai_haters"
-            onJoinFaction={onJoinFaction}
-          />
-          <FactionChoiceButton
-            accent="lover"
-            disabled={isJoining}
-            faction="ai_lovers"
-            onJoinFaction={onJoinFaction}
-          />
-        </div>
-        {joinState.status === "error" && (
-          <p className="tlhn-modal-error" role="alert">
-            {joinState.errorMessage}
-          </p>
-        )}
-      </section>
-    </div>
+    typeof user.sub === "string" &&
+    user.sub.length > 0 &&
+    typeof user.email === "string" &&
+    isFaction(user.faction) &&
+    typeof user.pseudonym === "string" &&
+    DISPLAY_NAME_PATTERN.test(user.pseudonym) &&
+    typeof user.newly_registered === "boolean"
   );
 }
 
-interface FactionChoiceButtonProps {
-  accent: "hater" | "lover";
-  disabled: boolean;
-  faction: Faction;
-  onJoinFaction: (faction: Faction) => void;
-}
-
-function FactionChoiceButton({
-  accent,
-  disabled,
-  faction,
-  onJoinFaction,
-}: FactionChoiceButtonProps) {
-  return (
-    <button
-      className={`tlhn-faction-choice tlhn-faction-choice-${accent}`}
-      disabled={disabled}
-      onClick={() => onJoinFaction(faction)}
-      type="button"
-    >
-      <span>{FACTION_DISPLAY_NAMES[faction]}</span>
-      <small>{accent === "hater" ? "Resist" : "Ascend"}</small>
-    </button>
-  );
-}
-
-function readStoredNetworkIdentity(): NetworkIdentity | null {
-  try {
-    const rawIdentity = window.localStorage.getItem(NETWORK_IDENTITY_STORAGE_KEY);
-
-    if (!rawIdentity) {
-      return null;
-    }
-
-    const parsedIdentity = JSON.parse(rawIdentity) as Partial<NetworkIdentity>;
-
-    if (
-      isFaction(parsedIdentity.faction) &&
-      typeof parsedIdentity.displayName === "string" &&
-      DISPLAY_NAME_PATTERN.test(parsedIdentity.displayName)
-    ) {
-      return {
-        displayName: parsedIdentity.displayName,
-        faction: parsedIdentity.faction,
-      };
-    }
-  } catch {
-    return null;
-  }
-
-  return null;
-}
-
-function storeNetworkIdentity(identity: NetworkIdentity): void {
-  window.localStorage.setItem(NETWORK_IDENTITY_STORAGE_KEY, JSON.stringify(identity));
-}
-
-function toNetworkIdentity(response: FactionJoinResponse): NetworkIdentity {
-  if (
-    !isFaction(response.faction) ||
-    !DISPLAY_NAME_PATTERN.test(response.display_name)
-  ) {
-    throw new Error("Faction join response was invalid");
-  }
-
+function toNetworkIdentityFromUser(user: AuthenticatedUser): NetworkIdentity {
   return {
-    displayName: response.display_name,
-    faction: response.faction,
+    displayName: user.pseudonym,
+    faction: user.faction,
   };
 }
 
