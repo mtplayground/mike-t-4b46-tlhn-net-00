@@ -206,6 +206,18 @@
     @apply relative z-10 m-0 mt-5 rounded border border-tlhn-bone/10 bg-tlhn-void/70 px-4 py-5 font-terminal text-sm uppercase text-tlhn-ash;
   }
 
+  .tlhn-auth-gate {
+    @apply relative z-10 grid gap-3 font-terminal sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center;
+  }
+
+  .tlhn-auth-gate-status {
+    @apply m-0 min-w-0 rounded border border-tlhn-bone/10 bg-tlhn-void/70 px-4 py-3 text-xs font-bold uppercase text-tlhn-ash;
+  }
+
+  .tlhn-auth-sign-in-button {
+    @apply min-h-11 rounded border border-lover-500 bg-lover-500/10 px-4 text-sm font-bold uppercase text-tlhn-bone shadow-neon-lover transition duration-150 hover:bg-lover-500/20 focus:outline-none focus:ring-2 focus:ring-lover-500 focus:ring-offset-2 focus:ring-offset-tlhn-void disabled:cursor-wait disabled:opacity-65;
+  }
+
   .tlhn-network-footer-row {
     @apply border-tlhn-bone/15;
   }
