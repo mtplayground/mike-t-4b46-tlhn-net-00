@@ -51,18 +51,53 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     let authenticated_session =
         request_json(&mut authenticated_app, Method::GET, "/api/auth/session", None, &[]).await?;
     assert_eq!(authenticated_session.status, StatusCode::OK);
+    assert_eq!(authenticated_session.json["authenticated"], true);
     assert_eq!(
-        authenticated_session.json,
-        json!({
-            "authenticated": true,
-            "user": {
-                "sub": "platform-user-1",
-                "email": "human@example.test",
-                "email_verified": true,
-                "name": "TLHN Human",
-                "picture": "https://cdn.example.test/avatar.png"
-            }
-        })
+        authenticated_session.json["user"]["sub"],
+        "platform-user-1"
+    );
+    assert_eq!(
+        authenticated_session.json["user"]["email"],
+        "human@example.test"
+    );
+    assert_eq!(authenticated_session.json["user"]["email_verified"], true);
+    assert_eq!(authenticated_session.json["user"]["name"], "TLHN Human");
+    assert_eq!(
+        authenticated_session.json["user"]["picture"],
+        "https://cdn.example.test/avatar.png"
+    );
+    assert_eq!(
+        authenticated_session.json["user"]["newly_registered"],
+        true
+    );
+    let account_pseudonym = authenticated_session.json["user"]["pseudonym"]
+        .as_str()
+        .ok_or("missing account pseudonym")?
+        .to_owned();
+    let account_faction = authenticated_session.json["user"]["faction"]
+        .as_str()
+        .ok_or("missing account faction")?
+        .to_owned();
+    assert!(is_generated_display_name(&account_pseudonym));
+    assert!(matches!(
+        account_faction.as_str(),
+        "ai_haters" | "ai_lovers"
+    ));
+
+    let repeated_authenticated_session =
+        request_json(&mut authenticated_app, Method::GET, "/api/auth/session", None, &[]).await?;
+    assert_eq!(repeated_authenticated_session.status, StatusCode::OK);
+    assert_eq!(
+        repeated_authenticated_session.json["user"]["newly_registered"],
+        false
+    );
+    assert_eq!(
+        repeated_authenticated_session.json["user"]["pseudonym"].as_str(),
+        Some(account_pseudonym.as_str())
+    );
+    assert_eq!(
+        repeated_authenticated_session.json["user"]["faction"].as_str(),
+        Some(account_faction.as_str())
     );
 
     let mut login_app = build_app_with_platform_auth(&postgres.database_url()).await?;
@@ -590,6 +625,7 @@ impl TestPostgres {
         for migration in [
             manifest_dir.join("drizzle/0000_baseline.sql"),
             manifest_dir.join("drizzle/0001_create_core_tables.sql"),
+            manifest_dir.join("drizzle/0002_create_users.sql"),
         ] {
             run_command(
                 Command::new("psql")
