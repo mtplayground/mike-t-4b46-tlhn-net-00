@@ -164,11 +164,25 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         json!({"ai_haters": 1, "ai_lovers": 0})
     );
 
-    let invalid_message = request_json(
+    let unauthenticated_message = request_json(
         &mut app,
         Method::POST,
         "/api/messages",
-        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":""})),
+        Some(json!({"body":"No session signal."})),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(unauthenticated_message.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        unauthenticated_message.json["error"],
+        "Authentication required"
+    );
+
+    let invalid_message = request_json(
+        &mut authenticated_app,
+        Method::POST,
+        "/api/messages",
+        Some(json!({"body":""})),
         &[(header::CONTENT_TYPE.as_str(), "application/json")],
     )
     .await?;
@@ -176,12 +190,12 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert_eq!(invalid_message.json["error"], "Invalid message payload");
 
     let message_payload = json!({
-        "faction": "ai_haters",
-        "display_name": display_name,
+        "faction": if account_faction == "ai_haters" { "ai_lovers" } else { "ai_haters" },
+        "display_name": "spoofed_abc12",
         "body": "End-to-end human signal."
     });
     let created_message = request_json(
-        &mut app,
+        &mut authenticated_app,
         Method::POST,
         "/api/messages",
         Some(message_payload.clone()),
@@ -196,13 +210,24 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         created_message.json["message"]["body"],
         "End-to-end human signal."
     );
-    assert_eq!(created_message.json["message"]["user"], Value::Null);
+    assert_eq!(
+        created_message.json["message"]["display_name"].as_str(),
+        Some(account_pseudonym.as_str())
+    );
+    assert_eq!(
+        created_message.json["message"]["faction"].as_str(),
+        Some(account_faction.as_str())
+    );
+    assert_eq!(
+        created_message.json["message"]["user"].as_str(),
+        Some(account_pseudonym.as_str())
+    );
 
     let second_immediate_message = request_json(
-        &mut app,
+        &mut authenticated_app,
         Method::POST,
         "/api/messages",
-        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Second immediate signal."})),
+        Some(json!({"body":"Second immediate signal."})),
         &[
             (header::CONTENT_TYPE.as_str(), "application/json"),
             ("x-forwarded-for", "192.0.2.24"),
@@ -216,10 +241,10 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     );
 
     let third_immediate_message = request_json(
-        &mut app,
+        &mut authenticated_app,
         Method::POST,
         "/api/messages",
-        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Third immediate signal."})),
+        Some(json!({"body":"Third immediate signal."})),
         &[
             (header::CONTENT_TYPE.as_str(), "application/json"),
             ("x-forwarded-for", "192.0.2.24"),
@@ -233,10 +258,10 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     );
 
     let fourth_immediate_message = request_json(
-        &mut app,
+        &mut authenticated_app,
         Method::POST,
         "/api/messages",
-        Some(json!({"faction":"ai_haters", "display_name":"human_abc12", "body":"Fourth immediate signal."})),
+        Some(json!({"body":"Fourth immediate signal."})),
         &[
             (header::CONTENT_TYPE.as_str(), "application/json"),
             ("x-forwarded-for", "192.0.2.24"),
@@ -267,26 +292,32 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     for index in 1..=28 {
         insert_message(
             postgres.database_url().as_str(),
-            "ai_haters",
+            account_faction.as_str(),
             "sentinel_pg001",
             format!("Paged signal {index}").as_str(),
         )
         .await?;
     }
+    let opposite_faction = if account_faction == "ai_haters" {
+        "ai_lovers"
+    } else {
+        "ai_haters"
+    };
     for index in 1..=3 {
         insert_message(
             postgres.database_url().as_str(),
-            "ai_lovers",
+            opposite_faction,
             "oracle_cd456",
             format!("Blue signal {index}").as_str(),
         )
         .await?;
     }
 
+    let first_page_uri = format!("/api/messages?faction={account_faction}&limit=25");
     let first_page = request_json(
         &mut app,
         Method::GET,
-        "/api/messages?faction=ai_haters&limit=25",
+        &first_page_uri,
         None,
         &[],
     )
@@ -301,7 +332,8 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert_eq!(messages[24]["body"], "Paged signal 4");
     let before_id = messages[24]["id"].as_i64().ok_or("missing before id")?;
 
-    let second_page_uri = format!("/api/messages?faction=ai_haters&limit=25&before_id={before_id}");
+    let second_page_uri =
+        format!("/api/messages?faction={account_faction}&limit=25&before_id={before_id}");
     let second_page = request_json(&mut app, Method::GET, &second_page_uri, None, &[]).await?;
     assert_eq!(second_page.status, StatusCode::OK);
     assert_eq!(second_page.json["has_more"], false);
@@ -415,7 +447,7 @@ async fn build_app_with_auth_session(
         config: Arc::new(config),
         db_pool: pool,
         auth_verifier: Arc::new(auth_verifier),
-        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 1_000))),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 5_000))),
     }))
 }
 

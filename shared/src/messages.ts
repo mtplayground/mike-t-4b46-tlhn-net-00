@@ -13,8 +13,6 @@ export const listMessagesQuerySchema = z
 
 export const createMessageRequestSchema = z
   .object({
-    faction: factionSchema,
-    display_name: z.string().trim().min(1).max(80),
     body: z.string().trim().min(1).max(1000),
   })
   .strict();

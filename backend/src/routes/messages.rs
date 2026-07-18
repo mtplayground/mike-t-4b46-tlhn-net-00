@@ -1,4 +1,8 @@
-use crate::{app::AppDependencies, models::Faction};
+use crate::{
+    accounts::{get_or_create_account_identity, log_account_identity_error, AccountIdentity},
+    app::AppDependencies,
+    models::Faction,
+};
 use axum::{
     extract::{rejection::JsonRejection, RawQuery, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
@@ -28,8 +32,6 @@ struct ListMessagesQuery {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct CreateMessageRequest {
-    pub faction: Option<String>,
-    pub display_name: Option<String>,
     pub body: Option<String>,
 }
 
@@ -103,6 +105,34 @@ pub async fn create(
     headers: HeaderMap,
     body: Result<Json<CreateMessageRequest>, JsonRejection>,
 ) -> Response {
+    let session = match state.auth_verifier.verify_session(&headers).await {
+        Ok(Some(session)) => session,
+        Ok(None) => return unauthorized_message_post().into_response(),
+        Err(error) => {
+            tracing::error!(%error, "Platform session verification failed while posting message");
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorResponse {
+                    error: "Auth verification unavailable",
+                }),
+            )
+                .into_response();
+        }
+    };
+    let account = match get_or_create_account_identity(&state, &session).await {
+        Ok(account) => account,
+        Err(error) => {
+            log_account_identity_error(&error);
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: "Account identity unavailable",
+                }),
+            )
+                .into_response();
+        }
+    };
+
     let body = match body {
         Ok(Json(body)) => body,
         Err(_) => return invalid_message_payload("body", "Expected a JSON object").into_response(),
@@ -112,7 +142,7 @@ pub async fn create(
         Err(response) => return response.into_response(),
     };
 
-    let rate_limit_key = get_message_post_rate_limit_key(&headers);
+    let rate_limit_key = get_message_post_rate_limit_key(&account);
     let reservation = {
         let mut limiter = match state.message_post_rate_limiter.lock() {
             Ok(limiter) => limiter,
@@ -141,7 +171,7 @@ pub async fn create(
         }
     };
 
-    match insert_message(&state, &message).await {
+    match insert_message(&state, &account, &message).await {
         Ok(message) => {
             (StatusCode::CREATED, Json(CreateMessageResponse { message })).into_response()
         }
@@ -154,8 +184,6 @@ pub async fn create(
 
 #[derive(Clone, Debug)]
 struct ValidCreateMessage {
-    faction: Faction,
-    display_name: String,
     body: String,
 }
 
@@ -326,18 +354,20 @@ async fn load_messages(
 
 async fn insert_message(
     state: &AppDependencies,
+    account: &AccountIdentity,
     message: &ValidCreateMessage,
 ) -> Result<MessageResponse, sqlx::Error> {
     let row = sqlx::query(
         r#"
         insert into messages (faction, display_name, body, "user")
-        values ($1::faction, $2, $3, null)
+        values ($1::faction, $2, $3, $4)
         returning id, faction::text as faction, display_name, body, "user", to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
         "#,
     )
-    .bind(message.faction.as_str())
-    .bind(&message.display_name)
+    .bind(account.faction.as_str())
+    .bind(&account.pseudonym)
     .bind(&message.body)
+    .bind(&account.pseudonym)
     .fetch_one(&state.db_pool)
     .await?;
 
@@ -407,19 +437,6 @@ fn parse_list_query(
 fn validate_create_message(
     request: CreateMessageRequest,
 ) -> Result<ValidCreateMessage, (StatusCode, Json<ValidationErrorResponse>)> {
-    let faction = match request.faction.as_deref().and_then(Faction::parse) {
-        Some(faction) => faction,
-        None => return Err(invalid_message_payload("faction", "Invalid faction")),
-    };
-
-    let display_name = request.display_name.unwrap_or_default().trim().to_owned();
-    if display_name.is_empty() || display_name.len() > 80 {
-        return Err(invalid_message_payload(
-            "display_name",
-            "Expected 1 to 80 characters",
-        ));
-    }
-
     let body = request.body.unwrap_or_default().trim().to_owned();
     if body.is_empty() || body.len() > 1_000 {
         return Err(invalid_message_payload(
@@ -428,11 +445,7 @@ fn validate_create_message(
         ));
     }
 
-    Ok(ValidCreateMessage {
-        faction,
-        display_name,
-        body,
-    })
+    Ok(ValidCreateMessage { body })
 }
 
 fn invalid_message_query(
@@ -509,22 +522,17 @@ fn internal_server_error(error: sqlx::Error) -> (StatusCode, Json<ErrorResponse>
     )
 }
 
-fn get_message_post_rate_limit_key(headers: &HeaderMap) -> String {
-    get_first_header_value(headers, "x-forwarded-for")
-        .or_else(|| get_first_header_value(headers, "fly-client-ip"))
-        .or_else(|| get_first_header_value(headers, "cf-connecting-ip"))
-        .or_else(|| get_first_header_value(headers, "x-real-ip"))
-        .unwrap_or_else(|| "unknown-client".to_owned())
+fn get_message_post_rate_limit_key(account: &AccountIdentity) -> String {
+    format!("user:{}", account.sub)
 }
 
-fn get_first_header_value(headers: &HeaderMap, name: &str) -> Option<String> {
-    headers
-        .get(name)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|value| value.split(',').next())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
+fn unauthorized_message_post() -> (StatusCode, Json<ErrorResponse>) {
+    (
+        StatusCode::UNAUTHORIZED,
+        Json(ErrorResponse {
+            error: "Authentication required",
+        }),
+    )
 }
 
 fn system_time_to_iso(value: SystemTime) -> String {
@@ -563,47 +571,28 @@ mod tests {
     #[test]
     fn validates_and_trims_create_message() {
         let message = validate_create_message(CreateMessageRequest {
-            faction: Some("ai_haters".to_owned()),
-            display_name: Some("  Sentinel  ".to_owned()),
             body: Some("  Hold the line  ".to_owned()),
         })
         .expect("message should validate");
 
-        assert_eq!(message.faction, Faction::AiHaters);
-        assert_eq!(message.display_name, "Sentinel");
         assert_eq!(message.body, "Hold the line");
     }
 
     #[test]
     fn rejects_invalid_create_message() {
         assert!(validate_create_message(CreateMessageRequest {
-            faction: Some("robots".to_owned()),
-            display_name: Some("name".to_owned()),
-            body: Some("body".to_owned()),
-        })
-        .is_err());
-        assert!(validate_create_message(CreateMessageRequest {
-            faction: Some("ai_haters".to_owned()),
-            display_name: Some(" ".to_owned()),
-            body: Some("body".to_owned()),
-        })
-        .is_err());
-        assert!(validate_create_message(CreateMessageRequest {
-            faction: Some("ai_haters".to_owned()),
-            display_name: Some("name".to_owned()),
             body: Some(" ".to_owned()),
         })
         .is_err());
     }
 
     #[test]
-    fn chooses_first_client_ip_header_value() {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "x-forwarded-for",
-            HeaderValue::from_static("203.0.113.1, 10.0.0.1"),
+    fn rate_limits_by_authenticated_account_sub() {
+        let account = test_account_identity();
+        assert_eq!(
+            get_message_post_rate_limit_key(&account),
+            "user:platform-user-1"
         );
-        assert_eq!(get_message_post_rate_limit_key(&headers), "203.0.113.1");
     }
 
     #[test]
@@ -636,5 +625,20 @@ mod tests {
             limiter.reserve("client".to_owned()),
             RateLimitDecision::Allowed(_)
         ));
+    }
+
+    fn test_account_identity() -> AccountIdentity {
+        AccountIdentity {
+            sub: "platform-user-1".to_owned(),
+            email: "human@example.test".to_owned(),
+            email_verified: Some(true),
+            name: Some("TLHN Human".to_owned()),
+            picture_url: Some("https://cdn.example.test/avatar.png".to_owned()),
+            faction: Faction::AiHaters,
+            pseudonym: "sentinel_abc12".to_owned(),
+            created_at: "2026-07-18T00:00:00.000Z".to_owned(),
+            last_seen_at: "2026-07-18T00:00:00.000Z".to_owned(),
+            newly_registered: false,
+        }
     }
 }
