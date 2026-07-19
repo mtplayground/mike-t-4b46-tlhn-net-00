@@ -120,6 +120,116 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert!(login_url.contains("app_token=app_test"));
     assert!(login_url.contains("return_to=https%3A%2F%2Ftlhn-public.mctai.app"));
 
+    let mut news_app = build_app_with_news_bot_token(&postgres.database_url(), "news-token").await?;
+    let news_payload = json!({
+        "external_id": "wire:2026-07-19:001",
+        "title": "AI data center vote clears final committee",
+        "url": "https://news.example.test/ai-data-center-vote",
+        "summary": "A city committee advanced a contested AI infrastructure plan after hours of testimony.",
+        "source_name": "Example Wire",
+        "published_at": "2026-07-19T00:15:30Z"
+    });
+
+    let missing_news_token = request_json(
+        &mut news_app,
+        Method::POST,
+        "/api/news",
+        Some(news_payload.clone()),
+        &[(header::CONTENT_TYPE.as_str(), "application/json")],
+    )
+    .await?;
+    assert_eq!(missing_news_token.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(missing_news_token.json["error"], "News bot token required");
+
+    let invalid_news_token = request_json(
+        &mut news_app,
+        Method::POST,
+        "/api/news",
+        Some(news_payload.clone()),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            (header::AUTHORIZATION.as_str(), "Bearer wrong-token"),
+        ],
+    )
+    .await?;
+    assert_eq!(invalid_news_token.status, StatusCode::FORBIDDEN);
+    assert_eq!(invalid_news_token.json["error"], "Invalid news bot token");
+
+    let invalid_news_payload = request_json(
+        &mut news_app,
+        Method::POST,
+        "/api/news",
+        Some(json!({
+            "external_id": "wire:bad",
+            "title": "",
+            "url": "not-a-url",
+            "summary": "Missing a title and valid URL.",
+            "source_name": "Example Wire",
+            "published_at": "not-a-date"
+        })),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            (header::AUTHORIZATION.as_str(), "Bearer news-token"),
+        ],
+    )
+    .await?;
+    assert_eq!(invalid_news_payload.status, StatusCode::BAD_REQUEST);
+    assert_eq!(invalid_news_payload.json["error"], "Invalid news payload");
+
+    let created_news = request_json(
+        &mut news_app,
+        Method::POST,
+        "/api/news",
+        Some(news_payload.clone()),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            (header::AUTHORIZATION.as_str(), "Bearer news-token"),
+        ],
+    )
+    .await?;
+    assert_eq!(created_news.status, StatusCode::CREATED);
+    assert_eq!(
+        created_news.json["article"]["external_id"],
+        "wire:2026-07-19:001"
+    );
+    assert_eq!(
+        created_news.json["article"]["title"],
+        "AI data center vote clears final committee"
+    );
+    assert_eq!(
+        created_news.json["article"]["published_at"],
+        "2026-07-19T00:15:30.000Z"
+    );
+    let news_id = created_news.json["article"]["id"]
+        .as_i64()
+        .ok_or("missing news item id")?;
+
+    let updated_news = request_json(
+        &mut news_app,
+        Method::POST,
+        "/api/news",
+        Some(json!({
+            "external_id": "wire:2026-07-19:001",
+            "title": "AI data center vote clears full council",
+            "url": "https://news.example.test/ai-data-center-vote-updated",
+            "summary": "The same external story was updated after the full council vote.",
+            "source_name": "Example Wire",
+            "published_at": "2026-07-19T01:00:00Z"
+        })),
+        &[
+            (header::CONTENT_TYPE.as_str(), "application/json"),
+            (header::AUTHORIZATION.as_str(), "Bearer news-token"),
+        ],
+    )
+    .await?;
+    assert_eq!(updated_news.status, StatusCode::CREATED);
+    assert_eq!(updated_news.json["article"]["id"].as_i64(), Some(news_id));
+    assert_eq!(
+        updated_news.json["article"]["title"],
+        "AI data center vote clears full council"
+    );
+    assert_eq!(count_news_items(&postgres.database_url()).await?, 1);
+
     let initial_counts =
         request_json(&mut app, Method::GET, "/api/factions/counts", None, &[]).await?;
     assert_eq!(initial_counts.status, StatusCode::OK);
@@ -477,6 +587,29 @@ async fn build_app_with_platform_auth(
     }))
 }
 
+async fn build_app_with_news_bot_token(
+    database_url: &str,
+    news_bot_token: &str,
+) -> Result<Router, Box<dyn std::error::Error>> {
+    let config = ServerConfig::from_env_reader(|name| match name {
+        "DATABASE_URL" => Some(database_url.to_owned()),
+        "HOST" => Some("127.0.0.1".to_owned()),
+        "PORT" => Some("8080".to_owned()),
+        "NEWS_BOT_TOKEN" => Some(news_bot_token.to_owned()),
+        _ => None,
+    })?;
+    let pool = PgPoolOptions::new()
+        .max_connections(5)
+        .connect(database_url)
+        .await?;
+    Ok(create_app(AppDependencies {
+        config: Arc::new(config),
+        db_pool: pool,
+        auth_verifier: Arc::new(StaticSessionVerifier::unauthenticated()),
+        message_post_rate_limiter: Arc::new(Mutex::new(MessagePostRateLimiter::new(3, 5_000))),
+    }))
+}
+
 fn test_auth_session() -> AuthSession {
     AuthSession {
         sub: "platform-user-1".to_owned(),
@@ -603,6 +736,18 @@ async fn insert_message(
     Ok(())
 }
 
+async fn count_news_items(database_url: &str) -> Result<i64, Box<dyn std::error::Error>> {
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(database_url)
+        .await?;
+    let count = sqlx::query_scalar::<_, i64>("select count(*) from news_items")
+        .fetch_one(&pool)
+        .await?;
+    pool.close().await;
+    Ok(count)
+}
+
 struct TestPostgres {
     data_dir: PathBuf,
     work_dir: PathBuf,
@@ -658,6 +803,7 @@ impl TestPostgres {
             manifest_dir.join("drizzle/0000_baseline.sql"),
             manifest_dir.join("drizzle/0001_create_core_tables.sql"),
             manifest_dir.join("drizzle/0002_create_users.sql"),
+            manifest_dir.join("drizzle/0003_create_news_items.sql"),
         ] {
             run_command(
                 Command::new("psql")

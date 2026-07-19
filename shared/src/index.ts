@@ -25,3 +25,11 @@ export const FACTION_DISPLAY_NAMES: Record<Faction, string> = {
   ai_haters: "AI Haters",
   ai_lovers: "AI Lovers",
 };
+
+export { createNewsItemRequestSchema } from "./news.js";
+export type {
+  CreateNewsItemRequest,
+  CreateNewsItemResponse,
+  ListNewsResponse,
+  NewsArticleResponse,
+} from "./news.js";
