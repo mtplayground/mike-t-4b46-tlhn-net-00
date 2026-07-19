@@ -22,14 +22,16 @@ import type {
   MessagePostRateLimitResponse,
   MessageResponse,
 } from "@tlhn/shared/messages";
+import type { ListNewsResponse, NewsArticleResponse } from "@tlhn/shared/news";
 import type { SubscriptionResponse } from "@tlhn/shared/subscriptions";
 import { clientConfig } from "./config";
 
-type RoutePath = "/" | "/network";
+type RoutePath = "/" | "/network" | "/news";
 
 const ROUTES: Record<RoutePath, string> = {
   "/": "Landing",
   "/network": "Network",
+  "/news": "News",
 };
 
 const HUMAN_COLLAPSE_STORY_LINES = [
@@ -110,7 +112,13 @@ export function App() {
 
   return (
     <AppShell currentRoute={route} onNavigate={navigate}>
-      {route === "/network" ? <NetworkPage /> : <LandingPage onNavigate={navigate} />}
+      {route === "/network" ? (
+        <NetworkPage />
+      ) : route === "/news" ? (
+        <NewsPage />
+      ) : (
+        <LandingPage onNavigate={navigate} />
+      )}
     </AppShell>
   );
 }
@@ -206,6 +214,94 @@ function EnterNetworkButton({ onNavigate }: EnterNetworkButtonProps) {
       </span>
       <span>ENTER THE NETWORK</span>
     </a>
+  );
+}
+
+function NewsPage() {
+  const [articles, setArticles] = useState<NewsArticleResponse[]>([]);
+  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState<string>();
+
+  useEffect(() => {
+    const abortController = new AbortController();
+
+    const loadNews = async () => {
+      setStatus("loading");
+      try {
+        const response = await fetch("/api/news?limit=10", {
+          signal: abortController.signal,
+        });
+
+        if (!response.ok) {
+          throw new Error(`News fetch failed with status ${response.status}`);
+        }
+
+        const data = (await response.json()) as ListNewsResponse;
+        if (!data || !Array.isArray(data.articles)) {
+          throw new Error("News response was invalid");
+        }
+
+        setArticles(data.articles.filter(isNewsArticleResponse));
+        setStatus("ready");
+        setErrorMessage(undefined);
+      } catch (error) {
+        if (!abortController.signal.aborted) {
+          console.error("News fetch failed", error);
+          setStatus("error");
+          setErrorMessage(error instanceof Error ? error.message : "News fetch failed");
+        }
+      }
+    };
+
+    void loadNews();
+
+    return () => abortController.abort();
+  }, []);
+
+  return (
+    <section className="tlhn-news-panel" aria-labelledby="news-title">
+      <div className="tlhn-network-section-heading">
+        <div>
+          <p className="tlhn-network-kicker">Intercepted public signals</p>
+          <h1 className="tlhn-network-section-title" id="news-title">
+            Verified Transmissions
+          </h1>
+        </div>
+      </div>
+
+      {status === "error" ? (
+        <p className="tlhn-news-empty" role="alert">
+          &gt;_ News sync failed: {errorMessage ?? "unknown error"}
+        </p>
+      ) : status === "loading" ? (
+        <p className="tlhn-news-empty" role="status">
+          &gt;_ Scanning verified transmissions...
+        </p>
+      ) : articles.length === 0 ? (
+        <p className="tlhn-news-empty">No verified transmissions intercepted yet.</p>
+      ) : (
+        <ol className="tlhn-news-list" aria-label="Verified transmissions">
+          {articles.map((article) => (
+            <li className="tlhn-news-card" key={article.id}>
+              <article>
+                <div className="tlhn-news-source">
+                  <span>{article.source_name}</span>
+                  <time dateTime={article.published_at}>
+                    {formatPublishedDate(article.published_at)}
+                  </time>
+                </div>
+                <h2>
+                  <a href={article.url} target="_blank" rel="noopener noreferrer">
+                    {article.title}
+                  </a>
+                </h2>
+                <p>{article.summary}</p>
+              </article>
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
   );
 }
 
@@ -1345,7 +1441,43 @@ function getRouteFromPath(pathname: string): RoutePath {
     return "/network";
   }
 
+  if (pathname === "/news") {
+    return "/news";
+  }
+
   return "/";
+}
+
+function isNewsArticleResponse(value: unknown): value is NewsArticleResponse {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const article = value as Record<string, unknown>;
+  return (
+    typeof article.id === "number" &&
+    typeof article.title === "string" &&
+    typeof article.url === "string" &&
+    typeof article.summary === "string" &&
+    typeof article.source_name === "string" &&
+    typeof article.published_at === "string"
+  );
+}
+
+function formatPublishedDate(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) {
+    return "Timestamp unknown";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    month: "short",
+    timeZoneName: "short",
+    year: "numeric",
+  }).format(timestamp);
 }
 
 function formatRelativeTime(value: string, now: number): string {
