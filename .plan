@@ -1,45 +1,35 @@
-Architecture plan for Issues #155-#158: platform auth, user identity, posting gate, and frontend auth UX
+Architecture plan for issues #163-#165: TLHN news feed
 
-Current repository shape:
-- Product brand is The Last Human Network / TLHN, defined in shared/src/index.ts and mirrored in backend/src/models.rs.
-- backend/ is a Rust Axum API server that serves frontend/dist and /api/* routes from PostgreSQL via sqlx.
-- frontend/ is a Vite React SPA with the network page, faction selection, combined feed, and message composer in frontend/src/App.tsx.
-- shared/ contains TypeScript DTOs and Zod schemas for factions, messages, subscriptions, and product constants.
-- backend/drizzle/ holds plain SQL migrations; backend/tests/api.rs starts PostgreSQL, applies migrations, and covers the API flow.
+Current shape
+- Backend: Rust Axum API in `backend/src`, PostgreSQL via sqlx, Drizzle SQL files in `backend/drizzle`, routes mounted from `backend/src/app.rs` and route modules under `backend/src/routes`.
+- Shared DTOs: TypeScript workspace package `shared/src`, exported through `shared/src/index.ts` and imported by the Vite React frontend.
+- Frontend: React SPA in `frontend/src/App.tsx` with local route state for `/` and `/network`, styles in `frontend/src/styles.css`.
 
-Module structure and file organization:
-- Add backend/src/auth.rs for platform-session verification:
-  - cookie/header extraction for the platform session token.
-  - trusted request origin helpers that use X-Forwarded-Host / X-Forwarded-Proto or ALLOWED_CORS_ORIGIN when same-origin decisions are needed.
-  - an AuthIdentity struct with stable platform user id and optional profile fields returned by the platform auth service.
-  - verifier trait/client so route tests can inject deterministic authenticated/unauthenticated sessions without calling the platform.
-- Add backend/src/routes/auth.rs for auth routes:
-  - GET /api/auth/session returns { authenticated, user? } and creates/loads local account identity when authenticated.
-  - POST /api/auth/sign-out, if supported by the platform cookie flow, clears local app-visible auth state/cookies without inventing app JWTs.
-  - optional sign-in metadata route only if the platform requires a backend-provided login URL.
-- Extend backend/src/app.rs AppDependencies with an auth verifier/client and register /api/auth routes before the API not-found route.
-- Add backend/src/accounts.rs or backend/src/users.rs for user persistence:
-  - get_or_create_user_by_platform_id(platform_user_id) wraps user lookup, pseudonym/faction assignment, and race-safe upsert logic.
-  - shared pseudonym generation should reuse the existing Faction display_name_prefixes pattern where possible.
-- Add a new SQL migration backend/drizzle/0002_create_users.sql and update the migration runner/test helper when issue #156 is implemented.
-- Extend backend/src/models.rs with USERS_TABLE, UserRow, and any account-facing DTO helpers that are reused by routes.
-- Extend shared/src with auth/account DTOs:
-  - shared/src/auth.ts for AuthSessionResponse, AuthenticatedUser, SignInMetadata if needed.
-  - update shared/src/messages.ts so CreateMessageRequest contains only body once posting identity is server-derived.
-- Keep frontend/src/App.tsx as the first implementation point unless the auth UI grows enough to justify splitting into frontend/src/auth.ts and small components.
+Module/file organization
+- Add `backend/src/routes/news.rs` as the single news API module for both issue #163 and #164.
+  - `POST /api/news`: bot-only ingest endpoint, guarded by `Authorization: Bearer <NEWS_BOT_TOKEN>` from `ServerConfig`.
+  - `GET /api/news`: public read endpoint with limit/cursor pagination.
+  - Keep local request/response structs aligned with shared DTO field names and existing JSON error style.
+- Add `backend/drizzle/0003_create_news_items.sql` for persistent news storage in PostgreSQL.
+  - Table: `news_items(id serial primary key, external_id text unique, title text, url text, summary text, source_name text, published_at timestamptz, created_at timestamptz default now())`.
+  - Constraints: not-blank checks on external_id/title/url/summary/source_name.
+  - Index: `(published_at desc, id desc)` for newest-first pagination.
+- Extend `backend/src/config.rs` with optional/required `news_bot_token` handling from `NEWS_BOT_TOKEN`; the ingest route should return an auth/config error rather than using browser session auth.
+- Wire `news` in `backend/src/routes/mod.rs` and `backend/src/app.rs` at `/api/news` with `.get(news::list).post(news::create)`.
+- Add `shared/src/news.ts` with DTOs for ingest request, article response, and list response; export from `shared/src/index.ts`.
+- Extend `frontend/src/App.tsx` route union and nav to include `/news`, plus a public `NewsPage` that fetches `GET /api/news?limit=10`.
+- Extend `frontend/src/styles.css` with `.tlhn-news-panel`, `.tlhn-news-list`, `.tlhn-news-card`, `.tlhn-news-source`, and `.tlhn-news-empty` classes using the existing terminal/neon visual system.
 
-Issue dependency plan:
-- #155 is the backend foundation. It should introduce verification, auth routes, config/env, tests for valid/invalid/missing platform sessions, and no custom JWT or raw Google OAuth flow.
-- #156 depends on #155's verified platform identity. It adds the users table and local account identity keyed by platform_user_id, with stable pseudonym and faction.
-- #157 depends on #155 and #156. It changes POST /api/messages to require auth, derive faction/display_name/user from the authenticated local user, and leave GET /api/messages public.
-- #158 depends on #155-#157 route contracts. It loads /api/auth/session, adds sign-in UX, keeps the feed readable while logged out, and disables/replaces the composer until authenticated.
+Dependencies between issues
+- #163 is foundational: creates the table, bot token config, shared news DTOs, and `POST /api/news` upsert behavior.
+- #164 depends on #163: reuses `news_items` and `backend/src/routes/news.rs` to add public `GET /api/news` pagination and tests.
+- #165 depends on #164: consumes the public read endpoint from the SPA and adds `/news` navigation/UI.
 
-Key design decisions:
-- The app must trust the platform session only. Do not create app JWTs, do not store raw OAuth tokens, and do not add a separate Google OAuth flow.
-- Local users are application identity records, not authentication credentials. The canonical key is the platform identity; TLHN-owned fields are pseudonym, faction, timestamps, and optional display-safe metadata.
-- Faction/display name should become server-owned for posting. The current client localStorage identity and /api/factions/:faction/join cookie flow should either be retired or bridged during #156/#158 so the backend remains the source of truth.
-- Message posting should rate-limit by authenticated platform/local user id when available, not just IP. Missing/invalid sessions should return 401 with a stable JSON error.
-- Message reads stay public and unchanged in shape unless adding user/account fields is required; this preserves the logged-out feed experience.
-- CORS/same-origin logic must remain compatible with the Ideavibes reverse proxy: use X-Forwarded-Host/X-Forwarded-Proto or ALLOWED_CORS_ORIGIN, never raw Host alone.
-- Integration tests should keep using an injected auth verifier rather than external network calls. Add focused unit tests for cookie/header parsing, origin helpers, user upsert behavior, and create-message auth gating.
-- Frontend auth state should be explicit: loading, authenticated, unauthenticated, and error. Composer gating should prevent submission client-side, but the backend remains the authority.
+Key design decisions
+- Persistence is PostgreSQL only; no file/in-memory storage.
+- Bot ingest auth is intentionally separate from platform user sessions: compare the bearer token to `NEWS_BOT_TOKEN` server-side, do not expose this token to the browser.
+- `POST /api/news` should be idempotent on `external_id` with `INSERT ... ON CONFLICT (external_id) DO UPDATE`, returning the stored article consistently.
+- `GET /api/news` uses stable cursor pagination by `before_id`; query the cursor row first and then select rows older than `(published_at, id)` with `ORDER BY published_at DESC, id DESC`.
+- Validate request parameters and JSON bodies explicitly and return `400` for bad input, `401`/`403` for bot auth failures, matching existing API response patterns.
+- Frontend `/news` remains public and read-only; auth gating applies only to posting messages, not news reading.
+- External news links must use `target="_blank" rel="noopener noreferrer"`.
