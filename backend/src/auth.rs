@@ -276,6 +276,7 @@ mod tests {
             countdown_deadline_iso: "2029-12-01T07:00:00.000Z".to_owned(),
             public_base_url: None,
             platform_auth: None,
+            news_bot_token: None,
         };
 
         assert_eq!(

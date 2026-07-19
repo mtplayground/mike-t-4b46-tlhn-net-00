@@ -21,6 +21,10 @@
     "./subscriptions": {
       "types": "./dist/subscriptions.d.ts",
       "default": "./dist/subscriptions.js"
+    },
+    "./news": {
+      "types": "./dist/news.d.ts",
+      "default": "./dist/news.js"
     }
   },
   "scripts": {

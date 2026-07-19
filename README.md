@@ -53,6 +53,15 @@ tests start a local PostgreSQL 16 instance, apply the checked-in SQL migrations,
 and cover health, faction join idempotency, message validation, pagination,
 cooldown handling, subscription dedupe, SPA fallback, and an end-to-end API flow.
 
+## News Ingest
+
+Authenticated news ingest is available at `POST /api/news` for server-side bots only.
+Callers must send `Authorization: Bearer <NEWS_BOT_TOKEN>` with JSON containing
+`external_id`, `title`, `url`, `summary`, `source_name`, and RFC3339
+`published_at`. The backend stores articles in PostgreSQL and upserts
+idempotently by `external_id`; no browser session or app JWT is used for this
+endpoint.
+
 ## Production Build
 
 Build everything:
@@ -82,6 +91,7 @@ Required runtime environment:
   `5000`.
 - `COUNTDOWN_DEADLINE_ISO` - countdown deadline metadata, defaults to
   `2029-12-01T07:00:00.000Z`.
+- `NEWS_BOT_TOKEN` - server-side bearer token required for `POST /api/news`.
 
 Required frontend build-time environment:
 

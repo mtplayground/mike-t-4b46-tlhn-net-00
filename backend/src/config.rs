@@ -18,6 +18,7 @@ pub struct ServerConfig {
     pub countdown_deadline_iso: String,
     pub public_base_url: Option<String>,
     pub platform_auth: Option<PlatformAuthConfig>,
+    pub news_bot_token: Option<String>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -64,6 +65,7 @@ impl ServerConfig {
             )?,
             public_base_url: read_env("SELF_URL").filter(|value| !value.trim().is_empty()),
             platform_auth: parse_platform_auth_config(&read_env)?,
+            news_bot_token: read_env("NEWS_BOT_TOKEN").filter(|value| !value.trim().is_empty()),
         })
     }
 }
@@ -195,6 +197,7 @@ mod tests {
         );
         assert_eq!(config.public_base_url, None);
         assert_eq!(config.platform_auth, None);
+        assert_eq!(config.news_bot_token, None);
         assert!(config.database_url.contains("sslmode=require"));
     }
 
@@ -224,6 +227,17 @@ mod tests {
             config.public_base_url,
             Some("https://tlhn.example.test".to_owned())
         );
+    }
+
+    #[test]
+    fn reads_news_bot_token_when_present() {
+        let config = config_from(&[
+            ("DATABASE_URL", "postgresql://example.test/db"),
+            ("NEWS_BOT_TOKEN", "news-secret"),
+        ])
+        .expect("config should parse");
+
+        assert_eq!(config.news_bot_token.as_deref(), Some("news-secret"));
     }
 
     #[test]
