@@ -1,6 +1,6 @@
 use crate::app::AppDependencies;
 use axum::{
-    extract::{rejection::JsonRejection, State},
+    extract::{rejection::JsonRejection, RawQuery, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -9,13 +9,15 @@ use chrono::{DateTime, SecondsFormat, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use std::collections::HashMap;
-use url::Url;
+use url::{form_urlencoded, Url};
 
 const MAX_EXTERNAL_ID_LENGTH: usize = 256;
 const MAX_TITLE_LENGTH: usize = 300;
 const MAX_URL_LENGTH: usize = 2048;
 const MAX_SUMMARY_LENGTH: usize = 2_000;
 const MAX_SOURCE_NAME_LENGTH: usize = 160;
+const DEFAULT_LIMIT: i64 = 10;
+const MAX_LIMIT: i64 = 50;
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct CreateNewsItemRequest {
@@ -25,6 +27,12 @@ pub struct CreateNewsItemRequest {
     pub summary: Option<String>,
     pub source_name: Option<String>,
     pub published_at: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+struct ListNewsQuery {
+    limit: i64,
+    before_id: Option<i32>,
 }
 
 #[derive(Clone, Debug)]
@@ -55,6 +63,12 @@ pub struct CreateNewsItemResponse {
 }
 
 #[derive(Clone, Debug, Serialize)]
+pub struct ListNewsResponse {
+    pub has_more: bool,
+    pub articles: Vec<NewsArticleResponse>,
+}
+
+#[derive(Clone, Debug, Serialize)]
 pub struct ErrorResponse {
     pub error: &'static str,
 }
@@ -63,6 +77,18 @@ pub struct ErrorResponse {
 pub struct ValidationErrorResponse {
     pub error: &'static str,
     pub issues: HashMap<&'static str, Vec<&'static str>>,
+}
+
+pub async fn list(State(state): State<AppDependencies>, RawQuery(raw_query): RawQuery) -> Response {
+    let query = match parse_list_query(raw_query.as_deref()) {
+        Ok(query) => query,
+        Err(response) => return response.into_response(),
+    };
+
+    match load_news_items(&state, query).await {
+        Ok(response) => Json(response).into_response(),
+        Err(error) => internal_server_error(error).into_response(),
+    }
 }
 
 pub async fn create(
@@ -133,6 +159,116 @@ fn bearer_token(headers: &HeaderMap) -> Option<&str> {
     } else {
         None
     }
+}
+
+fn parse_list_query(
+    raw_query: Option<&str>,
+) -> Result<ListNewsQuery, (StatusCode, Json<ValidationErrorResponse>)> {
+    let mut limit = DEFAULT_LIMIT;
+    let mut before_id = None;
+
+    if let Some(raw_query) = raw_query {
+        for (key, value) in form_urlencoded::parse(raw_query.as_bytes()) {
+            match key.as_ref() {
+                "limit" => {
+                    let parsed = value
+                        .parse::<i64>()
+                        .ok()
+                        .filter(|value| *value >= 1)
+                        .ok_or_else(|| {
+                            invalid_news_query("limit", "Expected a positive integer")
+                        })?;
+                    limit = parsed.min(MAX_LIMIT);
+                }
+                "before_id" => {
+                    before_id = Some(
+                        value
+                            .parse::<i32>()
+                            .ok()
+                            .filter(|value| *value >= 1)
+                            .ok_or_else(|| {
+                                invalid_news_query("before_id", "Expected a positive integer")
+                            })?,
+                    );
+                }
+                _ => return Err(invalid_news_query("query", "Unknown query parameter")),
+            }
+        }
+    }
+
+    Ok(ListNewsQuery { limit, before_id })
+}
+
+async fn load_news_items(
+    state: &AppDependencies,
+    query: ListNewsQuery,
+) -> Result<ListNewsResponse, sqlx::Error> {
+    let fetch_limit = query.limit + 1;
+    let rows = match query.before_id {
+        Some(before_id) => {
+            sqlx::query(
+                r#"
+                with cursor_item as (
+                    select published_at, id
+                    from news_items
+                    where id = $1
+                )
+                select
+                    news_items.id,
+                    external_id,
+                    title,
+                    url,
+                    summary,
+                    source_name,
+                    to_char(news_items.published_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as published_at,
+                    to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+                from news_items, cursor_item
+                where
+                    news_items.published_at < cursor_item.published_at
+                    or (
+                        news_items.published_at = cursor_item.published_at
+                        and news_items.id < cursor_item.id
+                    )
+                order by news_items.published_at desc, news_items.id desc
+                limit $2
+                "#,
+            )
+            .bind(before_id)
+            .bind(fetch_limit)
+            .fetch_all(&state.db_pool)
+            .await?
+        }
+        None => {
+            sqlx::query(
+                r#"
+                select
+                    id,
+                    external_id,
+                    title,
+                    url,
+                    summary,
+                    source_name,
+                    to_char(published_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as published_at,
+                    to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as created_at
+                from news_items
+                order by published_at desc, id desc
+                limit $1
+                "#,
+            )
+            .bind(fetch_limit)
+            .fetch_all(&state.db_pool)
+            .await?
+        }
+    };
+
+    let has_more = rows.len() as i64 > query.limit;
+    let articles = rows
+        .into_iter()
+        .take(query.limit as usize)
+        .map(row_to_news_article_response)
+        .collect::<Result<Vec<_>, _>>()?;
+
+    Ok(ListNewsResponse { has_more, articles })
 }
 
 fn validate_create_news_item(
@@ -236,6 +372,21 @@ fn row_to_news_article_response(
     })
 }
 
+fn invalid_news_query(
+    field: &'static str,
+    message: &'static str,
+) -> (StatusCode, Json<ValidationErrorResponse>) {
+    let mut issues = HashMap::new();
+    issues.insert(field, vec![message]);
+    (
+        StatusCode::BAD_REQUEST,
+        Json(ValidationErrorResponse {
+            error: "Invalid news query",
+            issues,
+        }),
+    )
+}
+
 fn invalid_news_payload(
     field: &'static str,
     message: &'static str,
@@ -264,6 +415,27 @@ fn internal_server_error(error: sqlx::Error) -> (StatusCode, Json<ErrorResponse>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_default_list_query() {
+        let parsed = parse_list_query(None).expect("default query should parse");
+        assert_eq!(parsed.limit, DEFAULT_LIMIT);
+        assert_eq!(parsed.before_id, None);
+    }
+
+    #[test]
+    fn caps_list_query_limit() {
+        let parsed = parse_list_query(Some("limit=999&before_id=42"))
+            .expect("capped query should parse");
+        assert_eq!(parsed.limit, MAX_LIMIT);
+        assert_eq!(parsed.before_id, Some(42));
+    }
+
+    #[test]
+    fn rejects_invalid_list_query() {
+        let error = parse_list_query(Some("limit=0")).expect_err("query should be invalid");
+        assert_eq!(error.0, StatusCode::BAD_REQUEST);
+    }
 
     #[test]
     fn bearer_token_accepts_case_insensitive_bearer_scheme() {

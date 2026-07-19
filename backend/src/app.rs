@@ -68,7 +68,7 @@ pub fn create_app(dependencies: AppDependencies) -> Router {
         .route("/api/auth/login", get(auth::login))
         .route("/api/factions/counts", get(factions::counts))
         .route("/api/messages", get(messages::list).post(messages::create))
-        .route("/api/news", axum::routing::post(news::create))
+        .route("/api/news", get(news::list).post(news::create))
         .route(
             "/api/subscriptions",
             axum::routing::post(subscriptions::create),

@@ -120,6 +120,10 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
     assert!(login_url.contains("app_token=app_test"));
     assert!(login_url.contains("return_to=https%3A%2F%2Ftlhn-public.mctai.app"));
 
+    let empty_news = request_json(&mut app, Method::GET, "/api/news", None, &[]).await?;
+    assert_eq!(empty_news.status, StatusCode::OK);
+    assert_eq!(empty_news.json, json!({"has_more": false, "articles": []}));
+
     let mut news_app = build_app_with_news_bot_token(&postgres.database_url(), "news-token").await?;
     let news_payload = json!({
         "external_id": "wire:2026-07-19:001",
@@ -229,6 +233,61 @@ async fn rust_api_integration_flow_covers_existing_node_suite_behavior(
         "AI data center vote clears full council"
     );
     assert_eq!(count_news_items(&postgres.database_url()).await?, 1);
+
+    let seeded_news_ids = seed_news_items(&postgres.database_url(), 54).await?;
+    let first_news_page = request_json(&mut app, Method::GET, "/api/news?limit=3", None, &[])
+        .await?;
+    assert_eq!(first_news_page.status, StatusCode::OK);
+    assert_eq!(first_news_page.json["has_more"], true);
+    let first_articles = first_news_page.json["articles"]
+        .as_array()
+        .ok_or("articles should be an array")?;
+    assert_eq!(first_articles.len(), 3);
+    assert_eq!(first_articles[0]["title"], "Seed article 53");
+    assert_eq!(first_articles[1]["title"], "Seed article 52");
+    assert_eq!(first_articles[2]["title"], "Seed article 51");
+    assert_eq!(
+        first_articles[0]["id"].as_i64(),
+        seeded_news_ids.get(53).copied()
+    );
+    let before_news_id = first_articles[2]["id"]
+        .as_i64()
+        .ok_or("missing news cursor id")?;
+
+    let second_news_page_uri = format!("/api/news?limit=3&before_id={before_news_id}");
+    let second_news_page = request_json(&mut app, Method::GET, &second_news_page_uri, None, &[])
+        .await?;
+    assert_eq!(second_news_page.status, StatusCode::OK);
+    let second_articles = second_news_page.json["articles"]
+        .as_array()
+        .ok_or("articles should be an array")?;
+    assert_eq!(second_articles.len(), 3);
+    assert_eq!(second_articles[0]["title"], "Seed article 50");
+    assert_eq!(second_articles[1]["title"], "Seed article 49");
+    assert_eq!(second_articles[2]["title"], "Seed article 48");
+
+    let capped_news_page = request_json(&mut app, Method::GET, "/api/news?limit=999", None, &[])
+        .await?;
+    assert_eq!(capped_news_page.status, StatusCode::OK);
+    assert_eq!(capped_news_page.json["has_more"], true);
+    assert_eq!(
+        capped_news_page.json["articles"]
+            .as_array()
+            .ok_or("articles should be an array")?
+            .len(),
+        50
+    );
+
+    for invalid_uri in [
+        "/api/news?limit=0",
+        "/api/news?before_id=abc",
+        "/api/news?unexpected=true",
+    ] {
+        let invalid_news_query =
+            request_json(&mut app, Method::GET, invalid_uri, None, &[]).await?;
+        assert_eq!(invalid_news_query.status, StatusCode::BAD_REQUEST);
+        assert_eq!(invalid_news_query.json["error"], "Invalid news query");
+    }
 
     let initial_counts =
         request_json(&mut app, Method::GET, "/api/factions/counts", None, &[]).await?;
@@ -734,6 +793,38 @@ async fn insert_message(
     .await?;
     pool.close().await;
     Ok(())
+}
+
+async fn seed_news_items(
+    database_url: &str,
+    count: i32,
+) -> Result<Vec<i64>, Box<dyn std::error::Error>> {
+    let pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(database_url)
+        .await?;
+    let mut ids = Vec::new();
+    for index in 0..count {
+        let published_at = format!("2026-07-19T02:{index:02}:00Z");
+        let id = sqlx::query_scalar::<_, i64>(
+            r#"
+            insert into news_items (external_id, title, url, summary, source_name, published_at)
+            values ($1, $2, $3, $4, $5, $6::timestamptz)
+            returning id::bigint
+            "#,
+        )
+        .bind(format!("seed-news-{index:02}"))
+        .bind(format!("Seed article {index:02}"))
+        .bind(format!("https://news.example.test/seed-{index:02}"))
+        .bind(format!("Seed summary {index:02}"))
+        .bind("Example Wire")
+        .bind(published_at)
+        .fetch_one(&pool)
+        .await?;
+        ids.push(id);
+    }
+    pool.close().await;
+    Ok(ids)
 }
 
 async fn count_news_items(database_url: &str) -> Result<i64, Box<dyn std::error::Error>> {
